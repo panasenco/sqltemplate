@@ -49,7 +49,7 @@ function Use-SQL {
         $BaseName = [regex]::match($Path, '[^\\.]+(?=[^\\]*$)').Groups[0].Value -replace '^[\W\d_]*'
         if ($InlineReplace) {
             # Replace the references to the view/query with inline expressions containing the query body.
-            $InlineReplace -replace "?<=((FROM|JOIN)\s+)$BaseName","(`r`n$Body) $BaseName"
+            $InlineReplace -replace "(?<=(FROM|JOIN)\s+)$BaseName","(`r`n$Body) $BaseName"
         } elseif ($CTE) {
             # Output CTE to be used in a WITH statement
             "$BaseName AS (`r`n$Body)"
@@ -81,6 +81,31 @@ function Use-SQL {
     } else {
         $Body
     }
+}
+
+<#
+.Synopsis
+    Concatenates a list in a platform-appropriate manner.
+.Parameter Server
+    The server to concatenate the strings in.
+.Parameter StringList
+    The strings to concatenate.
+#>
+function New-Concat {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [string] $Server,
+        [Parameter(Mandatory=$true, Position=0)]
+        [string[]] $StringList
+    )
+    $ConcatOperator = switch -regex ($Server) {
+        'SS\d+' { ' + ' }
+        'ORACLE' { ' || ' }
+        default { Write-Error "Server $Server not yet supported for string concatenation" }
+    }
+    $StringList -join $ConcatOperator
 }
 
 <#
@@ -160,5 +185,25 @@ STUFF((
         default {
             Write-Error "Server $Server not yet supported for list aggregation"
         }
+    }
+}
+
+<#
+.Synopsis
+    Gets the current system date (no time component).
+.Parameter Server
+    The server to get the system date for.
+#>
+function New-SysDate {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [string] $Server
+    )
+    switch -regex ($Server) {
+        'SS\d+' { 'CAST(SYSDATETIME() AS date)' }
+        'ORACLE' { 'SYSDATE' }
+        default { Write-Error "Server $Server not yet supported for SYSTIME retrieval" }
     }
 }
