@@ -8,11 +8,8 @@
     The path to the .sql file to convert (does not modify the file, just goes to stdout).
 .Parameter Binding
     Hashtable containing value bindings to pass on to Invoke-EpsTemplate.
-    The 'Server' binding is mandatory - it is the type of server to compile the query for. The server binding allows
+    The 'Server' binding is important - it is the type of server to compile the query for. The server binding allows
     the use of platform-agnostic cmdlets like New-Concat, New-StringAgg, and New-ToDate in your EPS template files.
-.Parameter InlineReplace
-    SQL command where all instances of FROM <table> need to be replaced with FROM ({BODY}) {NAME}.
-    Recommended to be passed in through the pipeline.
 .Parameter CTE
     Set this switch to output in the CTE format {NAME} AS ({BODY}).
 .Parameter Inline
@@ -29,11 +26,8 @@ function Use-SQL {
     param (
         [Parameter(Mandatory=$true, Position=0)]
         [string] $Path,
-        [Parameter(Mandatory=$true)]
-        [ValidateScript({$_.server -match 'ORACLE|SS\d+'})]
-        [Hashtable] $Binding,
         [Parameter(ValueFromPipeline=$true)]
-        [string] $InlineReplace,
+        [Hashtable] $Binding,
         [switch] $CTE,
         [switch] $Inline,
         [string] $Prefix,
@@ -42,15 +36,12 @@ function Use-SQL {
     # Apply the EPS template
     $Body = $Binding | Invoke-EpsTemplate -Path $Path
 
-    if ($CTE -or $Inline -or $InlineReplace -or $Prefix) {
+    if ($CTE -or $Inline -or $Prefix) {
         # Indent everything two spaces
         $Body = $Body -replace '^','  ' -replace "`n","`n  " -replace '  $'
         # Get the filebasename with lead non-alpha characters stripped
         $BaseName = [regex]::match($Path, '[^\\.]+(?=[^\\]*$)').Groups[0].Value -replace '^[\W\d_]*'
-        if ($InlineReplace) {
-            # Replace the references to the view/query with inline expressions containing the query body.
-            $InlineReplace -replace "(?<=(FROM|JOIN)\s+)$BaseName","(`r`n$Body) $BaseName"
-        } elseif ($CTE) {
+        if ($CTE) {
             # Output CTE to be used in a WITH statement
             "$BaseName AS (`r`n$Body)"
         } elseif ($Inline) {
