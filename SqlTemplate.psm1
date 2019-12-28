@@ -76,6 +76,29 @@ function Use-SQL {
 
 <#
 .Synopsis
+    Converts dates to yyyymmdd integers.
+.Parameter Server
+    The server to convert the dates in.
+.Parameter Date
+    The date expression to convert.
+#>
+function ConvertTo-IntYYYYMMDD {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)]
+        [string] $Server,
+        [Parameter(Mandatory=$true, Position=0)]
+        [string[]] $Date
+    )
+    switch -regex ($Server) {
+        'SS\d\d.*' { "CAST(CONVERT(char(8), $Date, 112) AS int)" }
+        'ORA.*' { "TO_NUMBER(TO_CHAR($Date, 'YYYYMMDD'))" }
+        default { Write-Error "Server $Server not yet supported for date to yyyymmdd int conversion." }
+    }
+}
+
+<#
+.Synopsis
     Concatenates a list in a platform-appropriate manner.
 .Parameter Server
     The server to concatenate the strings in.
