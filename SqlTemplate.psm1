@@ -27,7 +27,7 @@ function Use-SQL {
         [Parameter(Mandatory=$true, Position=0)]
         [string] $Path,
         [Parameter(ValueFromPipeline=$true)]
-        [Hashtable] $Binding,
+        [Hashtable] $Binding = @{},
         [switch] $CTE,
         [switch] $Inline,
         [string] $Prefix,
