@@ -76,6 +76,29 @@ function Use-SQL {
 
 <#
 .Synopsis
+    Converts strings to integers.
+.Parameter Server
+    The server to convert the strings in.
+.Parameter String
+    The date expression to convert.
+#>
+function ConvertTo-Int{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string[]] $String
+    )
+    switch -regex ($Server) {
+        'SS\d\d.*' { "CAST($String AS int)" }
+        'ORA.*' { "TO_NUMBER($String)" }
+        default { Write-Error "Server $Server not yet supported for string to int conversion." }
+    }
+}
+
+<#
+.Synopsis
     Converts dates to yyyymmdd integers.
 .Parameter Server
     The server to convert the dates in.
@@ -85,14 +108,14 @@ function Use-SQL {
 function ConvertTo-IntYYYYMMDD {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
-        [string] $Server,
         [Parameter(Mandatory=$true, Position=0)]
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string[]] $Date
     )
     switch -regex ($Server) {
-        'SS\d\d.*' { "CAST(CONVERT(char(8), $Date, 112) AS int)" }
-        'ORA.*' { "TO_NUMBER(TO_CHAR($Date, 'YYYYMMDD'))" }
+        'SS\d\d.*' { "CONVERT(char(8), $Date, 112)" | ConvertTo-Int -Server $Server }
+        'ORA.*' { "TO_CHAR($Date, 'YYYYMMDD')" | ConvertTo-Int -Server $Server }
         default { Write-Error "Server $Server not yet supported for date to yyyymmdd int conversion." }
     }
 }
@@ -102,24 +125,32 @@ function ConvertTo-IntYYYYMMDD {
     Concatenates a list in a platform-appropriate manner.
 .Parameter Server
     The server to concatenate the strings in.
-.Parameter StringList
+.Parameter InputString
     The strings to concatenate.
 #>
 function New-Concat {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
         [string] $Server,
-        [Parameter(Mandatory=$true, Position=0)]
-        [string[]] $StringList
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string] $InputString
     )
-    $ConcatOperator = switch -regex ($Server) {
-        'SS\d+' { ' + ' }
-        'ORACLE' { ' || ' }
-        default { Write-Error "Server $Server not yet supported for string concatenation" }
+    begin {
+        $ConcatOperator = switch -regex ($Server) {
+            'SS\d+' { ' + ' }
+            'ORACLE' { ' || ' }
+            default { Write-Error "Server $Server not yet supported for string concatenation" }
+        }
+        $OutString = ''
     }
-    $StringList -join $ConcatOperator
+    process {
+        $OutString += $InputString + $ConcatOperator
+    }
+    end {
+        $OutString.Substring(0, $OutString.Length - $ConcatOperator.Length)
+    }
 }
 
 <#
@@ -133,10 +164,10 @@ function New-Concat {
 function New-QuotedId {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
         [string] $Server,
-        [Parameter(Mandatory=$true, Position=0)]
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string] $Name
     )
     $QuoteChars = switch -regex ($Server) {
@@ -165,10 +196,10 @@ function New-QuotedId {
 function New-StringAgg {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [ValidateSet("ORACLE", "SS13")]
         [string] $Server,
-        [Parameter(Mandatory=$true, Position=0)]
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string] $Expression,
         [string] $GroupField = '',
         [string] $Separator = '',
@@ -204,6 +235,24 @@ STUFF((
 
 <#
 .Synopsis
+    Outputs substring function - SUBSTR for Oracle, SUBSTRING for everything else.
+.Parameter Server
+    The server to output substring function for.
+#>
+function New-Substring {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $Server
+    )
+    switch -regex ($Server) {
+        'ORACLE' { 'SUBSTR' }
+        default { 'SUBSTRING' }
+    }
+}
+
+<#
+.Synopsis
     Gets the current system date (no time component).
 .Parameter Server
     The server to get the system date for.
@@ -211,7 +260,7 @@ STUFF((
 function New-SysDate {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
         [string] $Server
     )
