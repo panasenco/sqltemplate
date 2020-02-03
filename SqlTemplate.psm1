@@ -5,7 +5,8 @@
     Can process a SQL query with EPS templating, change it to run on a particular server, and package it up as a CTE,
     inline query, or a CREATE OR ALTER VIEW AS statement.
 .Parameter Path
-    The path to the .sql file to convert (does not modify the file, just goes to stdout).
+    The path to the .eps1.sql file to convert (does not modify the file, just goes to stdout).
+    NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
 .Parameter Binding
     Hashtable containing value bindings to pass on to Invoke-EpsTemplate.
     The 'Server' binding is important - it is the type of server to compile the query for. The server binding allows
@@ -34,7 +35,11 @@ function Use-SQL {
         [switch] $Diff
     )
     # Apply the EPS template
-    $Body = $Binding | Invoke-EpsTemplate -Path $Path
+    if ($Path -match '.*\.eps1\.sql\s*$') {
+        $Body = $Binding | Invoke-EpsTemplate -Path $Path
+    } else {
+        $Body = Get-Content -Raw -Path $Path
+    }
 
     if ($CTE -or $Inline -or $Prefix) {
         # Indent everything two spaces
@@ -80,9 +85,9 @@ function Use-SQL {
 .Parameter Server
     The server to convert the strings in.
 .Parameter String
-    The date expression to convert.
+    The string to convert.
 #>
-function ConvertTo-Int{
+function ConvertTo-Int {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
