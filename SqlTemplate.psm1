@@ -81,6 +81,40 @@ function Use-SQL {
 
 <#
 .Synopsis
+    Converts strings to dates.
+.Parameter Server
+    The server to convert the strings in.
+.Parameter String
+    The date expression to convert.
+.Parameter Format
+    The Oracle-style format mask to use for the conversion.
+#>
+function ConvertTo-Date {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string[]] $String,
+        [Parameter(Mandatory=$true, Position=1)]
+        [string] $Format
+    )
+    switch -regex ($Server) {
+        'ORA.*' { "TO_DATE($String, '$Format')" }
+        'SS\d\d.*' {
+            # Determine the T-SQL datetime style code
+            $SqlStyleCode = switch ($Format) {
+                'MM/DD/YYYY' { 101 }
+                default { Write-Error "Can't find matching T-SQL style code for datetime format '$Format'" }
+            }
+            "CONVERT(DATETIME, $String, $SqlStyleCode)"
+        }
+        default { Write-Error "Server $Server not yet supported for string to datetime conversion." }
+    }
+}
+
+<#
+.Synopsis
     Converts strings to integers.
 .Parameter Server
     The server to convert the strings in.
