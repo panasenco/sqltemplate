@@ -161,6 +161,34 @@ function ConvertTo-IntYYYYMMDD {
 
 <#
 .Synopsis
+    Computes the difference between two dates in days.
+.Parameter Server
+    The server to concatenate the strings in.
+.Parameter StartDate
+    The date to subtract from EndDate.
+.Parameter EndDate
+    The date to subtract StartDate from.
+#>
+function New-DateDiff {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [string] $Server,
+        [Parameter(Mandatory=$true)]
+        [string] $StartDate,
+        [Parameter(Mandatory=$true)]
+        [string] $EndDate
+    )
+    switch -regex ($Server) {
+        'SS\d+' { "DATEDIFF(day, $StartDate, $EndDate)" }
+        'ORACLE' { "$EndDate - $StartDate" }
+        default { Write-Error "Server $Server not yet supported for string concatenation" }
+    }
+}
+
+<#
+.Synopsis
     Concatenates a list in a platform-appropriate manner.
 .Parameter Server
     The server to concatenate the strings in.
