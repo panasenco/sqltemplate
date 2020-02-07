@@ -255,6 +255,8 @@ function New-QuotedId {
 .Parameter GroupField
     The fully qualified field to group by. The part after the last period is assumed to be the field name. The part
     before the last period is assumed to be the fully qualified table name. Only mandatory for SQL Server '13.
+.Parameter Filter
+    WHERE filter to apply to the table before aggregating.
 .Parameter Separator
     The separator to use when aggregating.
 .Parameter Order
@@ -268,6 +270,7 @@ function New-StringAgg {
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string] $Expression,
         [string] $GroupField = '',
+        [string] $Filter = '',
         [string] $Separator = '',
         [string] $Order = '1'
     )
@@ -279,12 +282,13 @@ function New-StringAgg {
             } else {
                 Write-Error 'GroupField param mandatory for SQL Server 13'
             }
+            if ($Filter) { $AdditionalFilter = "`n        AND $Filter" }
 @"
 STUFF((
       SELECT
         N'$Separator' + $Expression
       FROM $Table t2
-      WHERE $Table.$Field=t2.$Field
+      WHERE $Table.$Field=t2.$Field$AdditionalFilter
       ORDER BY $Order
       FOR XML PATH (N'')
     ), 1, $($Separator.Length), N'') 
