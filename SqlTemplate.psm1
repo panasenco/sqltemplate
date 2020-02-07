@@ -62,7 +62,7 @@ function Use-SQL {
                         "USE $Database`nGO`nCREATE OR ALTER VIEW $Rest$BaseName AS`n$Body"
                     }
                 }
-                'ORACLE' { # Oracle PL/SQL
+                'ORA.*' { # Oracle PL/SQL
                     if ($Diff) {
                         "$Body`nMINUS SELECT * FROM $Prefix$BaseName"
                     } else {
@@ -173,7 +173,7 @@ function New-DateDiff {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
-        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
         [string] $Server,
         [Parameter(Mandatory=$true)]
         [string] $StartDate,
@@ -182,7 +182,7 @@ function New-DateDiff {
     )
     switch -regex ($Server) {
         'SS\d+' { "DATEDIFF(day, $StartDate, $EndDate)" }
-        'ORACLE' { "$EndDate - $StartDate" }
+        'ORA.*' { "$EndDate - $StartDate" }
         default { Write-Error "Server $Server not yet supported for string concatenation" }
     }
 }
@@ -199,7 +199,7 @@ function New-Concat {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
-        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
         [string] $Server,
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string] $InputString
@@ -207,7 +207,7 @@ function New-Concat {
     begin {
         $ConcatOperator = switch -regex ($Server) {
             'SS\d+' { ' + ' }
-            'ORACLE' { ' || ' }
+            'ORA.*' { ' || ' }
             default { Write-Error "Server $Server not yet supported for string concatenation" }
         }
         $OutString = ''
@@ -232,14 +232,14 @@ function New-QuotedId {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
-        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
         [string] $Server,
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string] $Name
     )
     $QuoteChars = switch -regex ($Server) {
         'SS\d+' { '[',']' }
-        'ORACLE' { '"', '"' }
+        'ORA.*' { '"', '"' }
         default { Write-Error "Server $Server not yet supported for identifier quoting" }
     }
     $QuoteChars[0] + $Name + $QuoteChars[1]
@@ -264,7 +264,6 @@ function New-StringAgg {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
-        [ValidateSet("ORACLE", "SS13")]
         [string] $Server,
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [string] $Expression,
@@ -272,7 +271,7 @@ function New-StringAgg {
         [string] $Separator = '',
         [string] $Order = '1'
     )
-    switch ($Server) {
+    switch -regex ($Server) {
         'SS13' {
             if ($GroupField) {
                 $Table = ($GroupField | Select-String -Pattern '.*(?=\.[^\.]*)').Matches[0].Value
@@ -291,7 +290,7 @@ STUFF((
     ), 1, $($Separator.Length), N'') 
 "@
         }
-        'ORACLE' {
+        'ORA.*' {
             "LISTAGG($Expression, '$Separator') WITHIN GROUP (ORDER BY $Order)"
         }
         default {
@@ -313,7 +312,7 @@ function New-Substring {
         [string] $Server
     )
     switch -regex ($Server) {
-        'ORACLE' { 'SUBSTR' }
+        'ORA.*' { 'SUBSTR' }
         default { 'SUBSTRING' }
     }
 }
@@ -328,12 +327,12 @@ function New-SysDate {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
-        [ValidateScript({$_ -eq "ORACLE" -or $_ -match "SS\d+"})]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
         [string] $Server
     )
     switch -regex ($Server) {
         'SS\d+' { 'CAST(SYSDATETIME() AS date)' }
-        'ORACLE' { 'SYSDATE' }
+        'ORA.*' { 'SYSDATE' }
         default { Write-Error "Server $Server not yet supported for SYSTIME retrieval" }
     }
 }
