@@ -40,6 +40,14 @@ function Use-SQL {
     } else {
         $Body = Get-Content -Raw -Path $Path
     }
+    
+    # Prepend the git log message if inside a valid git repository
+    try {
+        git rev-parse 2>&1 | Out-Null
+        $Origin = git config --get remote.origin.url
+        $Body = "/* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n "+`
+            "$((git log --graph --pretty=oneline --abbrev-commit -- $Path) -join "`r`n ")`r`n */`r`n`r`n$Body"
+    } catch {}
 
     if ($CTE -or $Inline -or $Prefix) {
         # Indent everything two spaces
