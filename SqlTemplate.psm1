@@ -40,15 +40,17 @@ function Use-SQL {
     } else {
         $Body = Get-Content -Raw -Path $Path
     }
- 
-    # Prepend the git log message if inside a valid git repository
-    try {
-        git rev-parse 2>&1 | Out-Null
-        $Origin = git config --get remote.origin.url
-        $Body = "/* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n "+`
-            "$((git log --graph --pretty=oneline --abbrev-commit -- $Path) -join "`r`n ")`r`n */`r`n`r`n$Body"
-    } catch {}
-
+    
+    # Prepend the git log message if defining a view or stored procedure and inside a valid git repository
+    if ($Prefix -or $Body -match 'CREATE\s+(OR\s+ALTER\s+|)(PROCEDURE|VIEW)') {
+        try {
+            git rev-parse 2>&1 | Out-Null
+            $Origin = git config --get remote.origin.url
+            $Body = "/* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n "+`
+                "$((git log --graph --pretty=oneline --abbrev-commit -- $Path) -join "`r`n ")`r`n */`r`n`r`n$Body"
+        } catch {}
+    }
+    
     if ($CTE -or $Inline -or $Prefix) {
         # Indent everything two spaces
         $Body = $Body -replace '^','  ' -replace "`n","`n  " -replace '  $'
@@ -61,6 +63,7 @@ function Use-SQL {
             # Output inline expression to be used with a FROM statement
             "(`r`n$Body) $BaseName"
         } elseif ($Prefix) {
+            # Create a CREATE OR ALTER VIEW statement with the appropriate dialect
             switch -regex ($Binding.Server) {
                 'SS\d+' { # Microsoft SQL Server
                     $Database, $Rest = $Prefix -split '\.',2
