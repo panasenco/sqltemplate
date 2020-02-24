@@ -40,7 +40,7 @@ function Use-SQL {
     } else {
         $Body = Get-Content -Raw -Path $Path
     }
-    
+ 
     # Prepend the git log message if inside a valid git repository
     try {
         git rev-parse 2>&1 | Out-Null
@@ -251,6 +251,36 @@ function New-QuotedId {
         default { Write-Error "Server $Server not yet supported for identifier quoting" }
     }
     $QuoteChars[0] + $Name + $QuoteChars[1]
+}
+
+<#
+.Synopsis
+    Sanitizes provided input string, making sure the output is free of nonprinting characters.
+.Parameter Server
+    The server to sanitize the string for.
+.Parameter String
+    The string to sanitize.
+#>
+function New-Sanitize {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string] $String
+    )
+    switch -regex ($Server) {
+        'SS\d+' {
+            # This function does additional processing in addition to sanitizing, but it gets the job done.
+            "STRING_ESCAPE($String, 'json')"
+        }
+        'ORA.*' {
+            # This is the desired effect - just removing special characters
+            "REGEXP_REPLACE($String, '[[:cntrl:]]')"
+        }
+        default { Write-Error "Server $Server not yet supported for string sanitization" }
+    }
 }
 
 <#

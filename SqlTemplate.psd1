@@ -92,7 +92,7 @@ RequiredModules = @("EPS")
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @('Use-SQL', 'ConvertTo-Date', 'ConvertTo-Int', 'ConvertTo-IntYYYYMMDD', 'New-Concat',
-    'New-DateDiff', 'New-QuotedId', 'New-StringAgg', 'New-Substring', 'New-SysDate')
+    'New-DateDiff', 'New-QuotedId', 'New-Sanitize', 'New-StringAgg', 'New-Substring', 'New-SysDate')
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
