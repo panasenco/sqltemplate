@@ -18,6 +18,10 @@
 .Parameter Prefix
     Set to script the query as a CREATE OR ALTER VIEW statement with the given fully qualified prefix.
     The prefix is prepended as is, and must include a trailing period if there is one.
+.Parameter Materialize
+    Modifies the behavior of Prefix flag to materialize the query in a table rather than create a view.
+    Note that this flag relies on sane indentation - on SQL Server, the line with the FROM with the fewest whitespace
+    characters in front of it is the one we'll place the INTO line above of.
 .Parameter Diff
     Modifies the behavior of Prefix flag to create a query that checks for differences against an existing view rather
     than update the view.
@@ -32,6 +36,7 @@ function Use-SQL {
         [switch] $CTE,
         [switch] $Inline,
         [string] $Prefix,
+        [switch] $Materialize,
         [switch] $Diff
     )
     # Apply the EPS template
@@ -68,16 +73,27 @@ function Use-SQL {
                 'SS\d+' { # Microsoft SQL Server
                     $Database, $Rest = $Prefix -split '\.',2
                     if ($Diff) {
-                        "USE $Database`nGO`n$Body`nEXCEPT SELECT * FROM $Rest$BaseName"
+                        "USE $Database`r`nGO`r`n$Body`r`nEXCEPT SELECT * FROM $Rest$BaseName"
+                    } elseif ($Materialize) {
+                        # Find the index of the FROM that's least indented.
+                        $MainFromIndex = (($Body | Select-String -Pattern '(?<=[\n])[^\S\r\n]*FROM' `
+                            -AllMatches)[0].matches | Sort-Object -Property Length)[0].Index
+                        # Insert an INTO right above that FROM
+                        $Body = $Body.Insert($MainFromIndex, "INTO $Rest$BaseName`r`n")
+                        # Put it all together an deindent
+                        "USE $Database`r`nGO`r`nIF OBJECT_ID('$Rest$BaseName', 'U') IS NOT NULL " +
+                            "DROP TABLE $Rest$BaseName;`r`n`r`n$Body" -replace "`n  ","`n"
                     } else {
-                        "USE $Database`nGO`nCREATE OR ALTER VIEW $Rest$BaseName AS`n$Body"
+                        "USE $Database`r`nGO`r`nCREATE OR ALTER VIEW $Rest$BaseName AS`r`n$Body"
                     }
                 }
                 'ORA.*' { # Oracle PL/SQL
                     if ($Diff) {
-                        "$Body`nMINUS SELECT * FROM $Prefix$BaseName"
+                        "$Body`r`nMINUS SELECT * FROM $Prefix$BaseName"
+                    } elseif ($Materialize) {
+                        "DROP TABLE IF EXISTS $Prefix$BaseName;`r`nCREATE TABLE $Prefix$BaseName AS`r`n$Body"
                     } else {
-                        "CREATE OR ALTER VIEW $Prefix$BaseName AS`n$Body"
+                        "CREATE OR ALTER VIEW $Prefix$BaseName AS`r`n$Body"
                     }
                 }
                 default {
