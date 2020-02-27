@@ -49,10 +49,21 @@ function Use-SQL {
     # Prepend the git log message if defining a view or stored procedure and inside a valid git repository
     if ($Prefix -or $Body -match 'CREATE\s+(OR\s+ALTER\s+|)(PROCEDURE|VIEW)') {
         try {
+            # This will throw an error if we're not in a valid Git repository
             git rev-parse 2>&1 | Out-Null
+            # Determine the remote origin if it exists
             $Origin = git config --get remote.origin.url
+            # Get the git log in a nice concise format
+            $GitLog = git log --graph --date=short --pretty='format:%ad %an%d %h: %s' -- $Path
+            # Replace useless refs in the first line
+            $GitLog = $GitLog -replace '(?<=\(.*)HEAD -> \w+, |, origin/\w+(?=.*\))'
+            # Warn the user if the file has uncommitted changes
+            if (git diff --name-only -- $Path) {
+                Write-Warning "$Path has uncommitted changes"
+                $GitLog = @("* $(Get-Date -Format 'yyyy-MM-dd') $(git config user.name) UNCOMMITTED CHANGES") + $GitLog
+            }
             $Body = "/* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n "+`
-                "$((git log --graph --pretty=oneline --abbrev-commit -- $Path) -join "`r`n ")`r`n */`r`n`r`n$Body"
+                "$($GitLog -join "`r`n ")`r`n */`r`n`r`n$Body"
         } catch {}
     }
     
