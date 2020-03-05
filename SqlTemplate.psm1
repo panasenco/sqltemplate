@@ -406,7 +406,7 @@ function New-StringAgg {
             } else {
                 Write-Error 'GroupField param mandatory for SQL Server 13'
             }
-            if ($Filter) { $AdditionalFilter = "`n        AND $Filter" }
+            if ($Filter) { $AdditionalFilter = "`r`n        AND $Filter" }
 @"
 STUFF((
       SELECT
