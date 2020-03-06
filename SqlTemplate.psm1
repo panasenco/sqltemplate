@@ -16,18 +16,23 @@
            The prefix is prepended as-is, and must include a trailing period if there is one.
            Note that materialization relies on sane indentation - on SQL Server, the line with the FROM with the fewest
            whitespace characters in front of it is the one we'll place the INTO line above of.
-           NOTE: Ignored if CTE or Inline flags are provided.
+           NOTE: Ignored if Inline switch is set. TempPrefix is used instead if CTE switch is set.
+     - TempPrefix: Materialization prefix for temporary tables. Set to $($Prefix)TEMP_ if not provided. Used instead
+           of $Prefix when -CTE switch is set.
 .Parameter ProcPrefix
     Modifies the behavior of the Prefix binding to create a stored procedure with the given prefix.
+    Git version history is prepended if this variable is provided.
 .Parameter CTE
-    Set this switch to output in the CTE format {NAME} AS ({BODY}).
+    Set this switch to output in the CTE format {NAME} AS ({BODY}). If materializing, setting this switch ensures that
+    TempPrefix is used instead of Prefix. This switch also turns off Git version history.
 .Parameter Inline
     Set this switch to output in the inline format ({BODY}) {NAME}.
 .Parameter View
     Modifies the behavior of the Prefix binding to create a view rather than materialize the query in a table.
+    Setting this switch also prepends Git version history.
 .Parameter Diff
-    Modifies the behavior of the Prefix binding to create a query that checks for differences against an existing table/view
-    rather than update it.
+    Modifies the behavior of the Prefix binding to create a query that checks for differences against an existing
+    table/view rather than update it.
 #>
 function Use-SQL {
     [CmdletBinding()]
@@ -46,24 +51,36 @@ function Use-SQL {
     $BaseName = [regex]::match($Path, '[^\\.]+(?=[^\\]*$)').Groups[0].Value -replace '^[\W\d_]*'
     
     # Define the time variables declaraion block
-    $TimeDeclare = "DECLARE @t1 DATETIME; DECLARE @t2 DATETIME;`r`n"
+    $TimeDeclare = "DECLARE @t1 DATETIME;`r`nDECLARE @t2 DATETIME;"
     
     # Get the raw body
     $Body = Get-Content -Raw -Path $Path
+
+    # Include TempPrefix if needed
+    if ($Binding.Prefix -and -not $Binding.TempPrefix) { $Binding += @{TempPrefix = $Binding.Prefix + 'TEMP_'} }
+    # Swap TempPrefix for Prefix if -CTE is set
+    if ($Binding.Prefix -and $CTE) { $Binding.Prefix = $Binding.TempPrefix }
     
-    # If database provided in SQL Server prefix, separate it out
+    # If database provided in SQL Server prefix, extract it
     $UseDatabase = ''
     if ($Binding.Server -match 'SS\d+') {
         $Database = ($Binding.Prefix  | Select-String -Pattern '.*(?=\.[^\.]*\.[^\.]*$)').Matches.Value
         if ($Database) {
-            $Binding.Prefix = ($Binding.Prefix | Select-String -Pattern '([^\.]+\.)?[^\.]*$').Matches.Value
             $UseDatabase = "USE $Database`r`nGO`r`n"
+            $PrefixWithoutDatabase = ($Binding.Prefix | Select-String -Pattern '([^\.]+\.)?[^\.]*$').Matches.Value
+            if ($ProcPrefix) {
+                # Remove database component from the prefix if we're creating a stored procedure.
+                $Binding.Prefix = $PrefixWithoutDatabase
+            }
+        } else {
+            $PrefixWithoutDatabase = $Binding.Prefix
         }
     }
     
     # Process materialization before applying the EPS template
-    $Materialize = $Binding.Prefix -and (-not $View) -and (-not $Diff) -and (-not $CTE) -and (-not $Inline)
+    $Materialize = $Binding.Prefix -and (-not $View) -and (-not $Diff) -and (-not $Inline)
     if ($Materialize) {
+        # Pre-process based on server type
         switch -regex ($Binding.Server) {
             'SS\d+' { # Microsoft SQL Server
                 # Find the index of the first FROM that's least indented and not already following an INTO.
@@ -84,44 +101,70 @@ function Use-SQL {
     
     # Apply the EPS template to the body
     if ($Path -match '.*\.eps1\.sql\s*$') {
-        $Binding.remove('Path')
-        $Body = ($Binding + @{path=$Path}) | Invoke-EpsTemplate -Template $Body
+        $BindingCopy = $Binding.Clone()
+        if (-not $Materialize) {
+            $BindingCopy.Remove('Prefix')
+            $BindingCopy.Remove('TempPrefix')
+        }
+        $BindingCopy.Remove('Path')
+        $Body = ($BindingCopy + @{Path=$Path}) | Invoke-EpsTemplate -Template $Body
     }
     
     if ($Materialize) {
         # Insert pre-creation drop block and timing initializer
         $PreCreationIndex = (($Body | Select-String -Pattern '(?<=GO\s*\r?\n)|^' `
             -AllMatches)[0].matches | Sort-Object -Descending -Property Index)[0].Index
-        $Body = $Body.Insert($PreCreationIndex,
-            "IF OBJECT_ID('$($Binding.Prefix)$BaseName', 'U') IS NOT NULL DROP TABLE $($Binding.Prefix)$BaseName;`r`n" +
-            "IF OBJECT_ID('$($Binding.Prefix)$BaseName', 'V') IS NOT NULL DROP VIEW $($Binding.Prefix)$BaseName;`r`n" +
-            "$($TimeDeclare)SET @t1 = GETDATE();`r`n")
+        $Body = $Body.Insert($PreCreationIndex, $UseDatabase +
+            "IF OBJECT_ID('$PrefixWithoutDatabase$BaseName', 'U') IS NOT NULL " +
+            "DROP TABLE $PrefixWithoutDatabase$BaseName;`r`n" +
+            "IF OBJECT_ID('$PrefixWithoutDatabase$BaseName', 'V') IS NOT NULL " +
+            "DROP VIEW $PrefixWithoutDatabase$BaseName;`r`n`r`n" +
+            "$TimeDeclare`r`nSET @t1 = GETDATE();`r`n`r`n")
         # Append timing block and GO
-        $Body += "SET @t2 = GETDATE(); SELECT FORMAT(DATEDIFF(millisecond,@t1,@t2)/1000.0, '.##') + " +
+        $Body += "`r`nSET @t2 = GETDATE();`r`nSELECT FORMAT(DATEDIFF(millisecond,@t1,@t2)/1000.0, '.##') + " +
         "' s to create $($Binding.Prefix)$BaseName' AS msg`r`nGO`r`n"
     }
-    if ($ProcPrefix -or $CTE -or $Inline -or $View -or $Diff) {
+    if ($ProcPrefix -or ($CTE -and -not $Materialize) -or ($Inline -and -not $Materialize) -or $View -or $Diff) {
         # Indent everything two spaces
         $Body = $Body -replace '^','  ' -replace "`n","`n  " -replace '  $'
+    
+        # Define git version history variable
+        $GitHistory = if ($ProcPrefix -or $View) {
+            try {
+                # This will throw an error if we're not in a valid Git repository
+                git rev-parse 2>&1 | Out-Null
+                # Determine the remote origin if it exists
+                $Origin = git config --get remote.origin.url
+                # Get the git log in a nice concise format
+                $GitLog = git log --graph --date=short --pretty='format:%ad %an%d %h: %s' -- $Path
+                # Replace useless refs in the first line
+                $GitLog = $GitLog -replace '(?<=\(.*)HEAD -> \w+, |, origin/\w+(?=.*\))'
+                # Warn the user if the file has uncommitted changes
+                if (git diff --name-only -- $Path) {
+                    Write-Warning "$Path has uncommitted changes"
+                    $GitLog = @("* $(Get-Date -Format 'yyyy-MM-dd') $(git config user.name) UNCOMMITTED CHANGES") + $GitLog
+                }
+                "  /* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n   "+`
+                    "$($GitLog -join "`r`n   ")`r`n   */`r`n`r`n"
+            } catch { '' }
+        } else { '' }
+        
         if ($Inline) {
             # Output inline expression to be used with a FROM statement
             $Body = "(`r`n$Body) $BaseName"
-        } elseif ($CTE) {
-            # Output CTE to be used in a WITH statement
-            $Body = "$BaseName AS (`r`n$Body)"
         } elseif ($Binding.Prefix) {
             switch -regex ($Binding.Server) {
                 'SS\d+' { # Microsoft SQL Server
-                    if ($ProcPrefix) {
-                        # Remove all GO and variable declaration lines in the body
-                        $Body = $Body -replace '\r\n\s*GO[^\S\r\n]*' -replace $TimeDeclare
-                        # Create stored procedure with given prefix
-                        $Body = "$($UseDatabase)CREATE OR ALTER PROCEDURE $ProcPrefix$BaseName AS`r`n" +
-                            "BEGIN`r`n  $TimeDeclare$Body`r`nEND`r`nGO"
-                    } elseif ($Diff) {
+                    if ($Diff) {
                         $Body = "$UseDatabase$Body`r`nEXCEPT SELECT * FROM $($Binding.Prefix)$BaseName"
                     } elseif ($View) {
-                        $Body = "$($UseDatabase)CREATE OR ALTER VIEW $($Binding.Prefix)$BaseName AS`r`n$Body"
+                        $Body = "$($UseDatabase)CREATE OR ALTER VIEW $($Binding.Prefix)$BaseName AS`r`n$GitHistory$Body"
+                    } elseif ($ProcPrefix) {
+                        # Remove all lines that begin with GO, DECLARE, or USE, as well as a preceding blank line if any
+                        $Body = $Body -replace '(\r\n|^)[^\S\r\n]*(GO|DECLARE|USE)[^\r\n]*'
+                        # Create stored procedure with given prefix
+                        $Body = "$($UseDatabase)CREATE OR ALTER PROCEDURE $ProcPrefix$BaseName AS`r`n" +
+                            "BEGIN`r`n$GitHistory  $($TimeDeclare -replace "`n","`n  ")`r`n$Body`r`nEND`r`nGO"
                     } else {
                         $Body = "$UseDatabase$Body"
                     }
@@ -137,9 +180,12 @@ function Use-SQL {
                     Write-Error "Unsupported server type: $Binding.Server."
                 }
             }
+        } elseif ($CTE) {
+            # Output CTE to be used in a WITH statement
+            $Body = "$BaseName AS (`r`n$Body)"
         }
     }
-    $Body
+    "$Body"
 }
 
 <#
@@ -220,37 +266,6 @@ function ConvertTo-IntYYYYMMDD {
         'ORA.*' { "TO_CHAR($Date, 'YYYYMMDD')" | ConvertTo-Int -Server $Server }
         default { Write-Error "Server $Server not yet supported for date to yyyymmdd int conversion." }
     }
-}
-
-<#
-.Synopsis
-    Outputs Git history of a file as a header.
-.Parameter Path
-    The path of the file to get Git history of.
-#>
-function Get-GitHistoryHeader {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
-        [string] $Path
-    )
-    try {
-        # This will throw an error if we're not in a valid Git repository
-        git rev-parse 2>&1 | Out-Null
-        # Determine the remote origin if it exists
-        $Origin = git config --get remote.origin.url
-        # Get the git log in a nice concise format
-        $GitLog = git log --graph --date=short --pretty='format:%ad %an%d %h: %s' -- $Path
-        # Replace useless refs in the first line
-        $GitLog = $GitLog -replace '(?<=\(.*)HEAD -> \w+, |, origin/\w+(?=.*\))'
-        # Warn the user if the file has uncommitted changes
-        if (git diff --name-only -- $Path) {
-            Write-Warning "$Path has uncommitted changes"
-            $GitLog = @("* $(Get-Date -Format 'yyyy-MM-dd') $(git config user.name) UNCOMMITTED CHANGES") + $GitLog
-        }
-        "/* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n "+`
-            "$($GitLog -join "`r`n ")`r`n */`r`n`r`n"
-    } catch {}
 }
 
 <#
