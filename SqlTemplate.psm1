@@ -453,8 +453,9 @@ STUFF((
       FROM $Table t2
       WHERE $Table.$Field=t2.$Field$AdditionalFilter
       ORDER BY $Order
-      FOR XML PATH (N'')
-    ), 1, $($Separator.Length), N'') 
+      FOR XML PATH (N''), ROOT('root'), type
+      ).value('/root[1]','VARCHAR(MAX)')
+    , 1, $($Separator.Length), N'') 
 "@
         }
         'ORA.*' {
