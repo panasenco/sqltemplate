@@ -331,6 +331,30 @@ function New-Concat {
 
 <#
 .Synopsis
+    Gets the length of an expression (LENGTH in Oracle, LEN in SQL Server)
+.Parameter Server
+    The server to get the length in.
+.Parameter Expression
+    The expression to find the length of.
+#>
+function New-Length {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string] $Expression
+    )
+    switch -regex ($Server) {
+        'SS\d+' { "LEN($Expression)" }
+        'ORA.*' { "LENGTH($Expression)" }
+        default { Write-Error "Server $Server not yet supported for length" }
+    }
+}
+
+<#
+.Synopsis
     Quotes the given identifier with quoting characters appropriate for the given server.
 .Parameter Server
     The server to quote the identifier for.
@@ -447,16 +471,54 @@ STUFF((
     Outputs substring function - SUBSTR for Oracle, SUBSTRING for everything else.
 .Parameter Server
     The server to output substring function for.
+.Parameter String
+    The string to get substring from.
+.Parameter Position
+    The starting position of the substring.
+.Parameter Length
+    The length of the substring.
 #>
 function New-Substring {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, Position=0)]
-        [string] $Server
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string] $String,
+        [string] $Position = '1',
+        [Parameter(Mandatory=$true)]
+        [string] $Length
     )
     switch -regex ($Server) {
-        'ORA.*' { 'SUBSTR' }
-        default { 'SUBSTRING' }
+        'ORA.*' { "SUBSTR($String, $Position, $Length)" }
+        default { "SUBSTRING($String, $Position, $Length)" }
+    }
+}
+
+<#
+.Synopsis
+    Outputs substring index function - INSTR for Oracle, CHARINDEX for SQL Server.
+.Parameter Server
+    The server to output the substring index function for.
+.Parameter String
+    The string to find the substring in.
+.Parameter Substring
+    The substring to search for in the string.
+#>
+function New-SubstringIndex {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $Server,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [string] $String,
+        [Parameter(Mandatory=$true)]
+        [string] $Substring
+    )
+    switch -regex ($Server) {
+        'ORA.*' { "INSTR($String, $Substring)" }
+        'SS\d+' { "CHARINDEX($Substring, $String)" }
+        default { Write-Error "Server $Server not yet supported for substring location." }
     }
 }
 
