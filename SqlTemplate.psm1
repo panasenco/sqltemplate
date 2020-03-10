@@ -158,7 +158,7 @@ function Use-SQL {
                     if ($Diff) {
                         $Body = "$UseDatabase$Body`r`nEXCEPT SELECT * FROM $($Binding.Prefix)$BaseName"
                     } elseif ($View) {
-                        $Body = "$($UseDatabase)CREATE OR ALTER VIEW $($Binding.Prefix)$BaseName AS`r`n$GitHistory$Body"
+                        $Body = "$($UseDatabase)CREATE OR ALTER VIEW $PrefixWithoutDatabase$BaseName AS`r`n$GitHistory$Body"
                     } elseif ($ProcPrefix) {
                         # Remove all lines that begin with GO, DECLARE, or USE, as well as a preceding blank line if any
                         $Body = $Body -replace '(\r\n|^)[^\S\r\n]*(GO|DECLARE|USE)[^\r\n]*'
