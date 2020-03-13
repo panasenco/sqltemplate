@@ -12,10 +12,13 @@
      - Server: The type of server to compile the query for. The server binding allows the use of platform-agnostic
            cmdlets like New-Concat, New-StringAgg, New-ToDate, and more in your EPS template files.
      - Prefix: Materialization prefix of tables that the user has rights to create. Passing this parameter is meant to
-           change the behavior of template files from queries to DROP TABLE;CREATE TABLE materialization procedures.
+           change the behavior of template files from queries to DROP TABLE;CREATE TABLE materialization script.
            The prefix is prepended as-is, and must include a trailing period if there is one.
-           Note that materialization relies on sane indentation - on SQL Server, the line with the FROM with the fewest
-           whitespace characters in front of it is the one we'll place the INTO line above of.
+           SQL Server notes:
+            - It is assumed that the prefix does NOT contain the database name, and that the script will be executed
+              within the intended database.
+            - Materialization relies on sane indentation - on SQL Server, the line with the FROM with the fewest
+              whitespace characters in front of it is the one we'll place the INTO line above of.
            NOTE: Ignored if Inline switch is set. TempPrefix is used instead if CTE switch is set.
      - TempPrefix: Materialization prefix for temporary tables. Set to $($Prefix)TEMP_ if not provided. Used instead
            of $Prefix when -CTE switch is set.
@@ -50,9 +53,6 @@ function Use-SQL {
     # Get the filebasename with lead non-alpha characters stripped
     $BaseName = [regex]::match($Path, '[^\\.]+(?=[^\\]*$)').Groups[0].Value -replace '^[\W\d_]*'
     
-    # Define the time variables declaraion block
-    $TimeDeclare = "DECLARE @t1 DATETIME;`r`nDECLARE @t2 DATETIME;"
-    
     # Get the raw body
     $Body = Get-Content -Raw -Path $Path
 
@@ -60,22 +60,6 @@ function Use-SQL {
     if ($Binding.Prefix -and -not $Binding.TempPrefix) { $Binding += @{TempPrefix = $Binding.Prefix + 'TEMP_'} }
     # Swap TempPrefix for Prefix if -CTE is set
     if ($Binding.Prefix -and $CTE) { $Binding.Prefix = $Binding.TempPrefix }
-    
-    # If database provided in SQL Server prefix, extract it
-    $UseDatabase = ''
-    if ($Binding.Server -match 'SS\d+') {
-        $Database = ($Binding.Prefix  | Select-String -Pattern '.*(?=\.[^\.]*\.[^\.]*$)').Matches.Value
-        if ($Database) {
-            $UseDatabase = "USE $Database`r`nGO`r`n"
-            $PrefixWithoutDatabase = ($Binding.Prefix | Select-String -Pattern '([^\.]+\.)?[^\.]*$').Matches.Value
-            if ($ProcPrefix) {
-                # Remove database component from the prefix if we're creating a stored procedure.
-                $Binding.Prefix = $PrefixWithoutDatabase
-            }
-        } else {
-            $PrefixWithoutDatabase = $Binding.Prefix
-        }
-    }
     
     # Process materialization before applying the EPS template
     $Materialize = $Binding.Prefix -and (-not $View) -and (-not $Diff) -and (-not $Inline)
@@ -106,23 +90,32 @@ function Use-SQL {
             $BindingCopy.Remove('Prefix')
             $BindingCopy.Remove('TempPrefix')
         }
+        if (-not $BindingCopy.IsChild) {
+            $BindingCopy += @{IsChild=$true}
+        }
         $BindingCopy.Remove('Path')
         $Body = ($BindingCopy + @{Path=$Path}) | Invoke-EpsTemplate -Template $Body
     }
     
     if ($Materialize) {
-        # Insert pre-creation drop block and timing initializer
-        $PreCreationIndex = (($Body | Select-String -Pattern '(?<=GO\s*\r?\n)|^' `
+        # If top-level, declare benchmark variables
+        $BenchmarkDeclaration = if (-not $Binding.IsChild) {
+            "DECLARE @BenchmarkStartTime DATETIME;`r`nDECLARE @BenchmarkEndTime DATETIME;`r`n`r`n"
+        } else {
+            ''
+        }
+        # Insert pre-creation drop and benchmark initialization blocks after the last benchmark completion block,
+        # or at the beginning of the body if there's no benchmark completion block in the body.
+        $PreCreationIndex = (($Body | Select-String -Pattern '(?<=@BenchmarkStartTime,\s*@BenchmarkEndTime[^\r]+\r\n)|^' `
             -AllMatches)[0].matches | Sort-Object -Descending -Property Index)[0].Index
-        $Body = $Body.Insert($PreCreationIndex, $UseDatabase +
-            "IF OBJECT_ID('$PrefixWithoutDatabase$BaseName', 'U') IS NOT NULL " +
-            "DROP TABLE $PrefixWithoutDatabase$BaseName;`r`n" +
-            "IF OBJECT_ID('$PrefixWithoutDatabase$BaseName', 'V') IS NOT NULL " +
-            "DROP VIEW $PrefixWithoutDatabase$BaseName;`r`n`r`n" +
-            "$TimeDeclare`r`nSET @t1 = GETDATE();`r`n`r`n")
-        # Append timing block and GO
-        $Body += "`r`nSET @t2 = GETDATE();`r`nSELECT FORMAT(DATEDIFF(millisecond,@t1,@t2)/1000.0, '.##') + " +
-        "' s to create $($Binding.Prefix)$BaseName' AS msg`r`nGO`r`n"
+        $Body = $Body.Insert($PreCreationIndex,
+            "IF OBJECT_ID('$($Binding.Prefix)$BaseName', 'U') IS NOT NULL DROP TABLE $($Binding.Prefix)$BaseName;`r`n" +
+            "IF OBJECT_ID('$($Binding.Prefix)$BaseName', 'V') IS NOT NULL DROP VIEW $($Binding.Prefix)$BaseName;`r`n`r`n" +
+            $BenchmarkDeclaration + "SET @BenchmarkStartTime = GETDATE();`r`n`r`n")
+        # Append benchmark completion block
+        $Body += "`r`nSET @BenchmarkEndTime = GETDATE();`r`n" +
+            "SELECT FORMAT(DATEDIFF(millisecond, @BenchmarkStartTime, @BenchmarkEndTime)/1000.0, '.##') + " +
+            "'s to create $($Binding.Prefix)$BaseName' AS msg`r`n"
     }
     if ($ProcPrefix -or ($CTE -and -not $Materialize) -or ($Inline -and -not $Materialize) -or $View -or $Diff) {
         # Indent everything two spaces
@@ -156,17 +149,13 @@ function Use-SQL {
             switch -regex ($Binding.Server) {
                 'SS\d+' { # Microsoft SQL Server
                     if ($Diff) {
-                        $Body = "$UseDatabase$Body`r`nEXCEPT SELECT * FROM $($Binding.Prefix)$BaseName"
+                        $Body = "$Body`r`nEXCEPT SELECT * FROM $($Binding.Prefix)$BaseName"
                     } elseif ($View) {
-                        $Body = "$($UseDatabase)CREATE OR ALTER VIEW $PrefixWithoutDatabase$BaseName AS`r`n$GitHistory$Body"
+                        $Body = "CREATE OR ALTER VIEW $($Binding.Prefix)$BaseName AS`r`n$GitHistory$Body"
                     } elseif ($ProcPrefix) {
-                        # Remove all lines that begin with GO, DECLARE, or USE, as well as a preceding blank line if any
-                        $Body = $Body -replace '(\r\n|^)[^\S\r\n]*(GO|DECLARE|USE)[^\r\n]*'
                         # Create stored procedure with given prefix
-                        $Body = "$($UseDatabase)CREATE OR ALTER PROCEDURE $ProcPrefix$BaseName AS`r`n" +
-                            "BEGIN`r`n$GitHistory  $($TimeDeclare -replace "`n","`n  ")`r`n$Body`r`nEND`r`nGO"
-                    } else {
-                        $Body = "$UseDatabase$Body"
+                        $Body = "CREATE OR ALTER PROCEDURE $ProcPrefix$BaseName AS`r`n" +
+                            "BEGIN`r`n$GitHistory`r`n$Body`r`nEND"
                     }
                 }
                 'ORA.*' { # Oracle PL/SQL
