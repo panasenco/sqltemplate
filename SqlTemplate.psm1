@@ -7,6 +7,8 @@
 .Parameter Path
     The path to the .eps1.sql file to convert (does not modify the file, just goes to stdout).
     NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
+.Parameter Wrapper
+    Name of a standard wrapper template (in the Wrappers directory) to further wrap the result in.
 .Parameter Binding
     Hashtable containing value bindings to pass on to Invoke-EpsTemplate. There are some reserved bindings:
      - Server: The type of server to compile the query for. The server binding allows the use of platform-agnostic
@@ -42,6 +44,7 @@ function Use-SQL {
     param (
         [Parameter(Mandatory=$true, Position=0)]
         [string] $Path,
+        [string] $Wrapper,
         [Parameter(ValueFromPipeline=$true)]
         [Hashtable] $Binding = @{},
         [string] $ProcPrefix,
@@ -173,6 +176,10 @@ function Use-SQL {
             # Output CTE to be used in a WITH statement
             $Body = "$BaseName AS (`r`n$Body)"
         }
+    }
+    if ($Wrapper) {
+        $Body = ($Binding.Clone() + @{Body=$Body}) |
+            Invoke-EpsTemplate -Path "$((Get-Module SqlTemplate).ModuleBase)\Wrappers\$Wrapper.eps1.sql"
     }
     "$Body"
 }
@@ -394,6 +401,26 @@ function New-Sanitize {
             "REGEXP_REPLACE($String, '[[:cntrl:]]')"
         }
         default { Write-Error "Server $Server not yet supported for string sanitization" }
+    }
+}
+
+<#
+.Synopsis
+    FROM expression for selecting a single line. Blank in SQL Server, "FROM dual" in Oracle.
+.Parameter Server
+    The server to select the single line in.
+#>
+function New-SingleSelectFrom {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [ValidateScript({$_ -match "ORA.*" -or $_ -match "SS\d+"})]
+        [string] $Server
+    )
+    switch -regex ($Server) {
+        'SS\d+' { "" }
+        'ORA.*' { "FROM dual" }
+        default { Write-Error "Server $Server not yet supported for single line selection" }
     }
 }
 
