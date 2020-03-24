@@ -91,9 +91,9 @@ RequiredModules = @("EPS")
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @('Use-SQL', 'ConvertTo-Date', 'ConvertTo-Int', 'ConvertTo-IntYYYYMMDD', 'New-Concat',
-    'New-DateDiff', 'New-Length', 'New-QuotedId', 'New-Sanitize', 'New-SingleSelectFrom', 'New-StringAgg',
-    'New-Substring', 'New-SubstringIndex', 'New-SysDate')
+FunctionsToExport = @('Use-Sql', 'ConvertTo-Date', 'ConvertTo-Int', 'ConvertTo-IntYYYYMMDD', 'Get-Basename',
+    'Get-GitHistoryHeader', 'New-Concat', 'New-DateDiff', 'New-Length', 'New-QuotedId', 'New-Sanitize',
+    'New-SingleSelectFrom', 'New-StringAgg', 'New-Substring', 'New-SubstringIndex', 'New-SysDate')
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()

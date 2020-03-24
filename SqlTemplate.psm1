@@ -4,184 +4,64 @@
 .Description
     Can process a SQL query with EPS templating, change it to run on a particular server, and package it up as a CTE,
     inline query, or a CREATE OR ALTER VIEW AS statement.
-.Parameter Path
-    The path to the .eps1.sql file to convert (does not modify the file, just goes to stdout).
-    NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
-.Parameter Wrapper
-    Name of a standard wrapper template (in the Wrappers directory) to further wrap the result in.
 .Parameter Binding
     Hashtable containing value bindings to pass on to Invoke-EpsTemplate. There are some reserved bindings:
      - Server: The type of server to compile the query for. The server binding allows the use of platform-agnostic
            cmdlets like New-Concat, New-StringAgg, New-ToDate, and more in your EPS template files.
-     - Prefix: Materialization prefix of tables that the user has rights to create. Passing this parameter is meant to
-           change the behavior of template files from queries to DROP TABLE;CREATE TABLE materialization script.
-           The prefix is prepended as-is, and must include a trailing period if there is one.
+     - ChildPath: The path to the child template file for wrapper templates.
+     - Prefix: List of 1 or 2 prefixes for database objects:
+           - The first prefix in the list is assumed to be the working schema with a trailing period if there is one.
+           - The second prefix in the list, if any, will be prepended to stored procedures and views after the first.
            SQL Server notes:
             - It is assumed that the prefix does NOT contain the database name, and that the script will be executed
               within the intended database.
+     - SecondaryPrefix: Additional prefix to be prepended after the main prefix and before the basename for stored
+           procedures and views.
+     - Materialize: Set this to True to indicate that any tables that can be materialized should be.
+           SQL Server notes:
             - Materialization relies on sane indentation - on SQL Server, the line with the FROM with the fewest
               whitespace characters in front of it is the one we'll place the INTO line above of.
-           NOTE: Ignored if Inline switch is set. TempPrefix is used instead if CTE switch is set.
-     - TempPrefix: Materialization prefix for temporary tables. Set to $($Prefix)TEMP_ if not provided. Used instead
-           of $Prefix when -CTE switch is set.
-.Parameter ProcPrefix
-    Modifies the behavior of the Prefix binding to create a stored procedure with the given prefix.
-    Git version history is prepended if this variable is provided.
-.Parameter CTE
-    Set this switch to output in the CTE format {NAME} AS ({BODY}). If materializing, setting this switch ensures that
-    TempPrefix is used instead of Prefix. This switch also turns off Git version history.
-.Parameter Inline
-    Set this switch to output in the inline format ({BODY}) {NAME}.
-.Parameter View
-    Modifies the behavior of the Prefix binding to create a view rather than materialize the query in a table.
-    Setting this switch also prepends Git version history.
-.Parameter Diff
-    Modifies the behavior of the Prefix binding to create a query that checks for differences against an existing
-    table/view rather than update it.
+     - TempPrefix: Materialization prefix for temporary tables. Set to $($Prefix)TEMP_ if not provided.
+.Parameter Template
+    The string template to apply.
+.Parameter Path
+    The path to the .eps1.sql template file to apply (does not modify the file, just goes to stdout).
+    NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
+.Parameter Wrapper
+    Name of a standard wrapper template (in the Wrappers directory of the SqlTemplate Module) to apply.
 #>
-function Use-SQL {
+function Use-Sql {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true, Position=0)]
-        [string] $Path,
-        [string] $Wrapper,
         [Parameter(ValueFromPipeline=$true)]
         [Hashtable] $Binding = @{},
-        [string] $ProcPrefix,
-        [switch] $CTE,
-        [switch] $Inline,
-        [switch] $View,
-        [switch] $Diff
+        [string] $Template,
+        [string] $Path,
+        [string] $Wrapper
     )
-    # Get the filebasename with lead non-alpha characters stripped
-    $BaseName = [regex]::match($Path, '[^\\.]+(?=[^\\]*$)').Groups[0].Value -replace '^[\W\d_]*'
     
-    # Get the raw body
-    $Body = Get-Content -Raw -Path $Path
-
-    # Include TempPrefix if needed
-    if ($Binding.Prefix -and -not $Binding.TempPrefix) { $Binding += @{TempPrefix = $Binding.Prefix + 'TEMP_'} }
-    # Swap TempPrefix for Prefix if -CTE is set
-    if ($Binding.Prefix -and $CTE) { $Binding.Prefix = $Binding.TempPrefix }
+    $Binding.Prefix = [string[]] $Binding.Prefix
     
-    # Process materialization before applying the EPS template
-    $Materialize = $Binding.Prefix -and (-not $View) -and (-not $Diff) -and (-not $Inline)
-    if ($Materialize) {
-        # Pre-process based on server type
-        switch -regex ($Binding.Server) {
-            'SS\d+' { # Microsoft SQL Server
-                # Find the index of the first FROM that's least indented and not already following an INTO.
-                $MainFromIndex = (($Body | Select-String -Pattern '(?<=[\n])[^\S\r\n]*FROM' `
-                    -AllMatches)[0].matches | Sort-Object -Property Length,Index)[0].Index
-                # Insert an INTO right above that FROM
-                $Body = $Body.Insert($MainFromIndex, "INTO $($Binding.Prefix)$BaseName`r`n")
-            }
-            'ORA.*' { # Oracle PL/SQL
-                $Body = "DROP TABLE IF EXISTS $($Binding.Prefix)$BaseName;`r`n" +
-                    "CREATE TABLE $($Binding.Prefix)$BaseName AS`r`n$Body"
-            }
-            default {
-                Write-Error "Unsupported server type: $Binding.Server."
-            }
-        }
+    if ($Template) {
+        # Save the template in a temporary .eps1.sql file and set the path to that file
+        [string] $TempPath = New-TemporaryFile
+        $Path = $TempPath + '.eps1.sql'
+        $Template | Set-Content -Path $Path
     }
     
-    # Apply the EPS template to the body
-    if ($Path -match '.*\.eps1\.sql\s*$') {
-        $BindingCopy = $Binding.Clone()
-        if (-not $Materialize) {
-            $BindingCopy.Remove('Prefix')
-            $BindingCopy.Remove('TempPrefix')
-        }
-        if (-not $BindingCopy.IsChild) {
-            $BindingCopy += @{IsChild=$true}
-        }
-        $BindingCopy.Remove('Path')
-        $Body = ($BindingCopy + @{Path=$Path}) | Invoke-EpsTemplate -Template $Body
-    }
-    
-    if ($Materialize) {
-        # If top-level, declare benchmark variables
-        $BenchmarkDeclaration = if (-not $Binding.IsChild) {
-            "DECLARE @BenchmarkStartTime DATETIME;`r`nDECLARE @BenchmarkEndTime DATETIME;`r`n`r`n"
-        } else {
-            ''
-        }
-        # Insert pre-creation drop and benchmark initialization blocks after the last benchmark completion block,
-        # or at the beginning of the body if there's no benchmark completion block in the body.
-        $PreCreationIndex = (($Body | Select-String -Pattern '(?<=@BenchmarkStartTime,\s*@BenchmarkEndTime[^\r]+\r\n)|^' `
-            -AllMatches)[0].matches | Sort-Object -Descending -Property Index)[0].Index
-        $Body = $Body.Insert($PreCreationIndex,
-            "IF OBJECT_ID('$($Binding.Prefix)$BaseName', 'U') IS NOT NULL DROP TABLE $($Binding.Prefix)$BaseName;`r`n" +
-            "IF OBJECT_ID('$($Binding.Prefix)$BaseName', 'V') IS NOT NULL DROP VIEW $($Binding.Prefix)$BaseName;`r`n`r`n" +
-            $BenchmarkDeclaration + "SET @BenchmarkStartTime = GETDATE();`r`n`r`n")
-        # Append benchmark completion block
-        $Body += "`r`nSET @BenchmarkEndTime = GETDATE();`r`n" +
-            "SELECT FORMAT(DATEDIFF(millisecond, @BenchmarkStartTime, @BenchmarkEndTime)/1000.0, '.##') + " +
-            "'s to create $($Binding.Prefix)$BaseName' AS msg`r`n"
-    }
-    if ($ProcPrefix -or ($CTE -and -not $Materialize) -or ($Inline -and -not $Materialize) -or $View -or $Diff) {
-        # Indent everything two spaces
-        $Body = $Body -replace '^','  ' -replace "`n","`n  " -replace '  $'
-    
-        # Define git version history variable
-        $GitHistory = if ($ProcPrefix -or $View) {
-            try {
-                # This will throw an error if we're not in a valid Git repository
-                git rev-parse 2>&1 | Out-Null
-                # Determine the remote origin if it exists
-                $Origin = git config --get remote.origin.url
-                # Get the git log in a nice concise format
-                $GitLog = git log --graph --date=short --pretty='format:%ad %an%d %h: %s' -- $Path
-                # Replace useless refs in the first line
-                $GitLog = $GitLog -replace '(?<=\(.*)HEAD -> \w+, |, origin/\w+(?=.*\))'
-                # Warn the user if the file has uncommitted changes
-                if (git diff --name-only -- $Path) {
-                    Write-Warning "$Path has uncommitted changes"
-                    $GitLog = @("* $(Get-Date -Format 'yyyy-MM-dd') $(git config user.name) UNCOMMITTED CHANGES") + $GitLog
-                }
-                "  /* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n   "+`
-                    "$($GitLog -join "`r`n   ")`r`n   */`r`n`r`n"
-            } catch { '' }
-        } else { '' }
-        
-        if ($Inline) {
-            # Output inline expression to be used with a FROM statement
-            $Body = "(`r`n$Body) $BaseName"
-        } elseif ($Binding.Prefix) {
-            switch -regex ($Binding.Server) {
-                'SS\d+' { # Microsoft SQL Server
-                    if ($Diff) {
-                        $Body = "$Body`r`nEXCEPT SELECT * FROM $($Binding.Prefix)$BaseName"
-                    } elseif ($View) {
-                        $Body = "CREATE OR ALTER VIEW $($Binding.Prefix)$BaseName AS`r`n$GitHistory$Body"
-                    } elseif ($ProcPrefix) {
-                        # Create stored procedure with given prefix
-                        $Body = "CREATE OR ALTER PROCEDURE $ProcPrefix$BaseName AS`r`n" +
-                            "BEGIN`r`n$GitHistory`r`n$Body`r`nEND"
-                    }
-                }
-                'ORA.*' { # Oracle PL/SQL
-                    if ($Diff) {
-                        $Body = "$Body`r`nMINUS SELECT * FROM $($Binding.Prefix)$BaseName"
-                    } elseif ($View) {
-                        $Body = "CREATE OR ALTER VIEW $($Binding.Prefix)$BaseName AS`r`n$Body"
-                    }
-                }
-                default {
-                    Write-Error "Unsupported server type: $Binding.Server."
-                }
-            }
-        } elseif ($CTE) {
-            # Output CTE to be used in a WITH statement
-            $Body = "$BaseName AS (`r`n$Body)"
-        }
-    }
     if ($Wrapper) {
-        $Body = ($Binding.Clone() + @{Body=$Body}) |
+        # Invoke wrapper
+        # Clone the binding to allow child processes to modify it without affecting each other
+        $Binding.Remove('ChildPath')
+        ($Binding.Clone() + @{ChildPath=$Path}) |
             Invoke-EpsTemplate -Path "$((Get-Module SqlTemplate).ModuleBase)\Wrappers\$Wrapper.eps1.sql"
+    } elseif ($Path -match '.*\.eps1\.sql\s*$') {
+        # Invoke the template only if the extension is .eps1.sql
+        $Binding.Clone() | Invoke-EpsTemplate -Path $Path
+    } else {
+        # Return the raw file contents if no name and the file extension is not .eps1.sql
+        Get-Content -Raw -Path $Path
     }
-    "$Body"
 }
 
 <#
@@ -261,6 +141,54 @@ function ConvertTo-IntYYYYMMDD {
         'SS\d\d.*' { "CONVERT(char(8), $Date, 112)" | ConvertTo-Int -Server $Server }
         'ORA.*' { "TO_CHAR($Date, 'YYYYMMDD')" | ConvertTo-Int -Server $Server }
         default { Write-Error "Server $Server not yet supported for date to yyyymmdd int conversion." }
+    }
+}
+
+<#
+.Synopsis
+    Outputs the base name of a file path.
+.Parameter Path
+    The path of the file to get the basename of.
+#>
+function Get-Basename {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [string] $Path
+    )
+    ($Path | Select-String -Pattern '[^\\.]+(?=[^\\]*$)' -AllMatches).Matches[0].Value
+}
+
+<#
+.Synopsis
+    Outputs Git history of a file as a header.
+.Parameter Path
+    The path of the file to get Git history of.
+#>
+function Get-GitHistoryHeader {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [string] $Path
+    )
+    try {
+        # This will throw an error if we're not in a valid Git repository
+        git rev-parse 2>&1 | Out-Null
+        # Determine the remote origin if it exists
+        $Origin = git config --get remote.origin.url
+        # Get the git log in a nice concise format
+        $GitLog = git log --graph --date=short --pretty='format:%ad %an%d %h: %s' -- $Path
+        # Replace useless refs in the first line
+        $GitLog = $GitLog -replace '(?<=\(.*)HEAD -> \w+, |, origin/\w+(?=.*\))'
+        # Warn the user if the file has uncommitted changes
+        if (git diff --name-only -- $Path) {
+            Write-Warning "$Path has uncommitted changes"
+            $GitLog = @("* $(Get-Date -Format 'yyyy-MM-dd') $(git config user.name) UNCOMMITTED CHANGES") + $GitLog
+        }
+        "  /* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n   "+`
+            "$($GitLog -join "`r`n   ")`r`n   */"
+    } catch {
+        ''
     }
 }
 
