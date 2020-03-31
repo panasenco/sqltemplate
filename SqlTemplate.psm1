@@ -17,22 +17,24 @@
             - It is assumed that the prefix does NOT contain the database name, and that the script will be executed
               within the intended database. This is necessary for running the SQL in automated tools.
      - TempPrefix: Materialization prefix for temporary tables. Set to $($Prefix[0])TEMP_ if not provided.
-.Parameter Template
-    The string template to apply.
 .Parameter Path
     The path to the .eps1.sql template file to apply (does not modify the file, just goes to stdout).
     NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
+.Parameter Template
+    The name of standard template (in the Templates directory of the SqlTemplate module) to invoke.
 .Parameter Wrappers
-    Array of standard wrapper templates (in the Wrappers directory of the SqlTemplate Module) to apply, in order from
-    innermost to outermost.
+    Array of names of standard wrapper templates (in the Wrappers directory of the SqlTemplate module) to apply, in
+    order from innermost to outermost.
 #>
 function Use-Sql {
     [CmdletBinding()]
     param (
         [Parameter(ValueFromPipeline=$true)]
         [Hashtable] $Binding = @{},
-        [string] $Template,
+        [Parameter(ParameterSetName='File template')]
         [string] $Path,
+        [Parameter(ParameterSetName='Standard template')]
+        [string] $Template,
         [string[]] $Wrappers
     )
     
@@ -40,10 +42,7 @@ function Use-Sql {
     $Binding.Prefix = [string[]] $Binding.Prefix
     
     if ($Template) {
-        # Save the template in a temporary .eps1.sql file and set the path to that file
-        [string] $TempPath = New-TemporaryFile
-        $Path = $TempPath + '.eps1.sql'
-        $Template | Set-Content -Path $Path
+        $Path = "$((Get-Module -Name SqlTemplate).ModuleBase)\Templates\$Template.eps1.sql"
     }
     
     if ($Path -match '.*\.eps1\.sql\s*$') {
@@ -54,93 +53,13 @@ function Use-Sql {
         $Body = Get-Content -Raw -Path $Path
     }
     
-    # Apply the wrappers in reverse order
+    # Apply the wrappers in order from innermost to outermost
     foreach ($Wrapper in $Wrappers) {
         $Body = ($Binding.Clone() + @{Body=$Body; ChildPath=$Path}) |
             Invoke-EpsTemplate -Path "$((Get-Module -Name SqlTemplate).ModuleBase)\Wrappers\$Wrapper.eps1.sql"
     }
     
     $Body
-}
-
-<#
-.Synopsis
-    Converts strings to dates.
-.Parameter Server
-    The server to convert the strings in.
-.Parameter String
-    The date expression to convert.
-.Parameter Format
-    The Oracle-style format mask to use for the conversion.
-#>
-function ConvertTo-Date {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true, Position=0)]
-        [string] $Server,
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
-        [string[]] $String,
-        [Parameter(Mandatory=$true, Position=1)]
-        [string] $Format
-    )
-    switch -regex ($Server) {
-        'ORA.*' { "TO_DATE($String, '$Format')" }
-        'SS\d\d.*' {
-            # Determine the T-SQL datetime style code
-            $SqlStyleCode = switch ($Format) {
-                'MM/DD/YYYY' { 101 }
-                default { Write-Error "Can't find matching T-SQL style code for datetime format '$Format'" }
-            }
-            "CONVERT(DATETIME, $String, $SqlStyleCode)"
-        }
-        default { Write-Error "Server $Server not yet supported for string to datetime conversion." }
-    }
-}
-
-<#
-.Synopsis
-    Converts strings to integers.
-.Parameter Server
-    The server to convert the strings in.
-.Parameter String
-    The string to convert.
-#>
-function ConvertTo-Int {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true, Position=0)]
-        [string] $Server,
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
-        [string[]] $String
-    )
-    switch -regex ($Server) {
-        'SS\d\d.*' { "CAST($String AS int)" }
-        'ORA.*' { "TO_NUMBER($String)" }
-        default { Write-Error "Server $Server not yet supported for string to int conversion." }
-    }
-}
-
-<#
-.Synopsis
-    Converts dates to yyyymmdd integers.
-.Parameter Server
-    The server to convert the dates in.
-.Parameter Date
-    The date expression to convert.
-#>
-function ConvertTo-IntYYYYMMDD {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true, Position=0)]
-        [string] $Server,
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
-        [string[]] $Date
-    )
-    switch -regex ($Server) {
-        'SS\d\d.*' { "CONVERT(char(8), $Date, 112)" | ConvertTo-Int -Server $Server }
-        'ORA.*' { "TO_CHAR($Date, 'YYYYMMDD')" | ConvertTo-Int -Server $Server }
-        default { Write-Error "Server $Server not yet supported for date to yyyymmdd int conversion." }
-    }
 }
 
 <#
@@ -156,39 +75,6 @@ function Get-Basename {
         [string] $Path
     )
     ($Path | Select-String -Pattern '[^\\.]+(?=[^\\]*$)' -AllMatches).Matches[0].Value
-}
-
-<#
-.Synopsis
-    Outputs Git history of a file as a header.
-.Parameter Path
-    The path of the file to get Git history of.
-#>
-function Get-GitHistoryHeader {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
-        [string] $Path
-    )
-    try {
-        # This will throw an error if we're not in a valid Git repository
-        git rev-parse 2>&1 | Out-Null
-        # Determine the remote origin if it exists
-        $Origin = git config --get remote.origin.url
-        # Get the git log in a nice concise format
-        $GitLog = git log --graph --date=short --pretty='format:%ad %an%d %h: %s' -- $Path
-        # Replace useless refs in the first line
-        $GitLog = $GitLog -replace '(?<=\(.*)HEAD -> \w+, |, origin/\w+(?=.*\))'
-        # Warn the user if the file has uncommitted changes
-        if (git diff --name-only -- $Path) {
-            Write-Warning "$Path has uncommitted changes"
-            $GitLog = @("* $(Get-Date -Format 'yyyy-MM-dd') $(git config user.name) UNCOMMITTED CHANGES") + $GitLog
-        }
-        "/* File History ($(if ($Origin) { "origin $Origin" } else { "no origin" })):`r`n "+`
-            "$($GitLog -join "`r`n ")`r`n */"
-    } catch {
-        ''
-    }
 }
 
 <#
