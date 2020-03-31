@@ -7,6 +7,6 @@ BEGIN
   DECLARE @BenchmarkStartTime DATETIME;
   DECLARE @BenchmarkEndTime DATETIME;
 
-  <%= $ChildPath | Get-GitHistoryHeader %>
-  <%= ($Binding | Use-Sql -Path $ChildPath -Wrapper Materialize) -replace "`n","`n  " %>
+  <%= ($ChildPath | Get-GitHistoryHeader) -replace "`n","`n  " %>
+  <%= $Body -replace "`n","`n  " %>
 END
