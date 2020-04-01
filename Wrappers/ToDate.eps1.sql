@@ -12,7 +12,7 @@
 switch -regex ($Server) {
     'ORA.*' {
 -%>
-TO_DATE(<%= $Body %>, '<%= $Format %>')
+TO_DATE(<%= $Body %>, '<%= $Format %>')<% -%>
 <%-
     }
     'SS\d\d.*' {
@@ -22,7 +22,7 @@ TO_DATE(<%= $Body %>, '<%= $Format %>')
             default { Write-Error "Can't find matching T-SQL style code for datetime format '$Format'" }
         }
 -%>
-CONVERT(DATETIME, <%= $Body %>, <%= $SqlStyleCode %>)
+CONVERT(DATETIME, <%= $Body %>, <%= $SqlStyleCode %>)<% -%>
 <%-
     }
     default { Write-Error "Server $Server not yet supported for string to datetime conversion." }

@@ -4,10 +4,16 @@
 .Binding TestSuiteName
     Name of the test suite.
 -%>
-SELECT '<?xml version="1.0" encoding="UTF-8"?>' AS test_result <%= New-SingleSelectFrom $Server %> UNION ALL
-SELECT '<testsuites>' AS test_result <%= New-SingleSelectFrom $Server %> UNION ALL
-SELECT '<testsuite name="<%= $TestSuiteName %>">' AS test_result <%= New-SingleSelectFrom $Server %> UNION ALL
+<%= $Binding |
+  Use-Sql -Template ("'<?xml version=" + '"1.0" encoding="UTF-8"?>' + "' AS test_result") -Wrapper 'SingleSelect' %>
+UNION ALL
+<%= $Binding | Use-Sql -Template "'<testsuites>' AS test_result" -Wrapper 'SingleSelect' %>
+UNION ALL
+<%= $Binding |
+  Use-Sql -Template ("'<testsuite name=" + '"' + $TestSuiteName + '"' + ">' AS test_result") -Wrapper 'SingleSelect' %>
+UNION ALL
 <%= $Body %>
 UNION ALL
-SELECT '</testsuite>' AS test_result <%= New-SingleSelectFrom $Server %> UNION ALL
-SELECT '</testsuites>' AS test_result <%= New-SingleSelectFrom $Server %>
+<%= $Binding | Use-Sql -Template "'</testsuite>' AS test_result" -Wrapper 'SingleSelect' %>
+UNION ALL
+<%= $Binding | Use-Sql -Template "'</testsuites>' AS test_result" -Wrapper 'SingleSelect' %>

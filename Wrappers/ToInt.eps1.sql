@@ -10,12 +10,12 @@
 switch -regex ($Server) {
     'ORA.*' {
 -%>
-TO_NUMBER(<%= $Body %>)
+TO_NUMBER(<%= $Body %>)<% -%>
 <%-
     }
     'SS\d\d.*' {
 -%>
-CAST(<%= $Body %> AS int)
+CAST(<%= $Body %> AS int)<% -%>
 <%-
     }
     default { Write-Error "Server $Server not yet supported for string to integer conversion." }

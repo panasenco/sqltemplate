@@ -12,4 +12,4 @@
         'ORA.*' { $Binding | Use-Sql -Template "TO_CHAR($Body, 'YYYYMMDD')" -Wrapper 'ToInt' }
         default { Write-Error "Server $Server not yet supported for date to yyyymmdd int conversion." }
     }
-%>
+-%>
