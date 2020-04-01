@@ -3,19 +3,19 @@
     Converts strings to integers.
 .Parameter Server
     The server to convert the strings in.
-.Parameter StringExpression
+.Parameter Body
     The string expression to convert to integer.
 -%>
 <%-
 switch -regex ($Server) {
     'ORA.*' {
 -%>
-TO_NUMBER(<%= $StringExpression %>)
+TO_NUMBER(<%= $Body %>)
 <%-
     }
     'SS\d\d.*' {
 -%>
-CAST(<%= $StringExpression %> AS int)
+CAST(<%= $Body %> AS int)
 <%-
     }
     default { Write-Error "Server $Server not yet supported for string to integer conversion." }

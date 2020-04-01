@@ -21,8 +21,8 @@
     The path to the .eps1.sql template file to apply (does not modify the file, just goes to stdout).
     NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
 .Parameter Template
-    The name of standard template (in the Templates directory of the SqlTemplate module) to invoke.
-.Parameter Wrappers
+    The string template to apply.
+.Parameter Wrapper
     Array of names of standard wrapper templates (in the Wrappers directory of the SqlTemplate module) to apply, in
     order from innermost to outermost.
 #>
@@ -35,17 +35,23 @@ function Use-Sql {
         [string] $Path,
         [Parameter(ParameterSetName='Standard template')]
         [string] $Template,
-        [string[]] $Wrappers
+        [string[]] $Wrapper
     )
     
     # Convert the prefix to array to handle optional additional prefixes for views and stored procedures
     $Binding.Prefix = [string[]] $Binding.Prefix
     
     if ($Template) {
-        $Path = "$((Get-Module -Name SqlTemplate).ModuleBase)\Templates\$Template.eps1.sql"
+        # Save the template in a temporary .eps1.sql file and set the path to that file
+        [string] $TempPath = New-TemporaryFile
+        $Path = $TempPath + '.eps1.sql'
+        $Template | Set-Content -Path $Path
     }
     
-    if ($Path -match '.*\.eps1\.sql\s*$') {
+    if ($Template) {
+        # Invoke the template
+        $Body = $Binding.Clone() | Invoke-EpsTemplate -Template $Template
+    } elseif ($Path -match '.*\.eps1\.sql\s*$') {
         # Invoke the template only if the extension is .eps1.sql
         $Body = $Binding.Clone() | Invoke-EpsTemplate -Path $Path
     } else {
@@ -54,9 +60,15 @@ function Use-Sql {
     }
     
     # Apply the wrappers in order from innermost to outermost
-    foreach ($Wrapper in $Wrappers) {
-        $Body = ($Binding.Clone() + @{Body=$Body; ChildPath=$Path}) |
-            Invoke-EpsTemplate -Path "$((Get-Module -Name SqlTemplate).ModuleBase)\Wrappers\$Wrapper.eps1.sql"
+    if ($Wrapper) {
+        $BindingCopy = $Binding.Clone()
+        $BindingCopy.Remove('Body')
+        $BindingCopy.Remove('ChildPath')
+        $BindingCopy.Add('ChildPath', $Path)
+        foreach ($WrapperName in $Wrapper) {
+            $Body = ($BindingCopy + @{Body=$Body}) |
+                Invoke-EpsTemplate -Path "$((Get-Module -Name SqlTemplate).ModuleBase)\Wrappers\$WrapperName.eps1.sql"
+        }
     }
     
     $Body
@@ -64,17 +76,25 @@ function Use-Sql {
 
 <#
 .Synopsis
-    Outputs the base name of a file path.
+    Get the SQL object name corresponding to a file with a given filepath.
 .Parameter Path
-    The path of the file to get the basename of.
+    The path of the file to get the basename of. If the path is not provided, a random string is returned.
 #>
-function Get-Basename {
+function Get-SqlBasename {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [Parameter(Position=0, ValueFromPipeline=$true)]
         [string] $Path
     )
-    ($Path | Select-String -Pattern '[^\\.]+(?=[^\\]*$)' -AllMatches).Matches[0].Value
+    if ($Path) {
+        # Get the basename of the file including secondary extensions
+        $Basename = (Get-Item -Path $Path).BaseName
+        # Strip the secondary extensions
+        ($Basename -split '\.')[0]
+    } else {
+        # Return a random collection of alpha characters
+        -join ((65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_})
+    }
 }
 
 <#
