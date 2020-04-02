@@ -10,13 +10,6 @@
            cmdlets like New-Concat, New-StringAgg, New-ToDate, and more in your EPS template files.
      - Body: The body of the nested template for wrapper templates.
      - ChildPath: The path to the child template file for wrapper templates.
-     - Prefix: List of 1 or 2 prefixes for database objects:
-           - The first prefix in the list is assumed to be the working schema with a trailing period if there is one.
-           - The second prefix in the list, if any, will be prepended to stored procedures and views after the first.
-           SQL Server notes:
-            - It is assumed that the prefix does NOT contain the database name, and that the script will be executed
-              within the intended database. This is necessary for running the SQL in automated tools.
-     - TempPrefix: Materialization prefix for temporary tables. Set to $($Prefix[0])TEMP_ if not provided.
 .Parameter Path
     The path to the .eps1.sql template file to apply (does not modify the file, just goes to stdout).
     NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
@@ -36,9 +29,6 @@ function Use-Sql {
         [string[]] $Wrapper
     )
     
-    # Convert the prefix to array to handle optional additional prefixes for views and stored procedures
-    $Binding.Prefix = [string[]] $Binding.Prefix
-    
     if (-not $Path) {
         # Invoke the template
         $Body = $Binding.Clone() | Invoke-EpsTemplate -Template $Template
@@ -50,12 +40,13 @@ function Use-Sql {
         $Body = Get-Content -Raw -Path $Path
     }
     
-    # Apply the wrappers in order from innermost to outermost
     if ($Wrapper) {
+        # Create a clean copy of the binding
         $BindingCopy = $Binding.Clone()
         $BindingCopy.Remove('Body')
         $BindingCopy.Remove('ChildPath')
         $BindingCopy.Add('ChildPath', $Path)
+        # Apply the wrappers in order from innermost to outermost
         foreach ($WrapperName in $Wrapper) {
             $Body = ($BindingCopy + @{Body=$Body}) |
                 Invoke-EpsTemplate -Path "$((Get-Module -Name SqlTemplate).ModuleBase)\Wrappers\$WrapperName.eps1.sql"
