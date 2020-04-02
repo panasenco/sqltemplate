@@ -1,10 +1,10 @@
 <%#
 .Synopsis
-    Converts strings to dates.
+    Converts dates to strings.
 .Parameter Server
-    The server to convert the strings in.
+    The server to convert the dates in.
 .Parameter Body
-    The string expression to convert to date.
+    The date expression to convert.
 .Parameter Format
     The Oracle-style format mask to use for the conversion.
 -%>
@@ -12,7 +12,7 @@
 switch -regex ($Server) {
     'ORA.*' {
 -%>
-TO_DATE(<%= $Body %>, '<%= $Format %>')<% -%>
+TO_CHAR(<%= $Body %>, '<%= $Format %>')<% -%>
 <%-
     }
     'SS\d\d.*' {
@@ -23,9 +23,9 @@ TO_DATE(<%= $Body %>, '<%= $Format %>')<% -%>
             default { Write-Error "Can't find matching T-SQL style code for datetime format '$Format'" }
         }
 -%>
-CONVERT(DATETIME, <%= $Body %>, <%= $SqlStyleCode %>)<% -%>
+CONVERT(char(8), <%= $Body %>, <%= $SqlStyleCode %>)<% -%>
 <%-
     }
-    default { Write-Error "Server $Server not yet supported for string to datetime conversion." }
+    default { Write-Error "Server $Server not yet supported for datetime to string conversion." }
 }
 -%>

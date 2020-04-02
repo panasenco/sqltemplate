@@ -36,6 +36,14 @@ Describe "Use-Sql" {
 E" -Wrapper 'DateDiff' |
                 Should -Be "DATEDIFF(day, S, E)"
         }
+        It "processes DateToString wrapper OK for Oracle" {
+            @{Server='ORA'; Format='YYYYMMDD'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
+                Should -Be "TO_CHAR('01/02/2003', 'YYYYMMDD')"
+        }
+        It "processes DateToString wrapper OK for SQL Server" {
+            @{Server='SS13'; Format='YYYYMMDD'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
+                Should -Be "CONVERT(char(8), '01/02/2003', 112)"
+        }
         It "processes QuotedId wrapper OK for Oracle" {
             @{Server='ORA'} | Use-Sql -Template "abcd" -Wrapper 'QuotedId' |
                 Should -Be '"abcd"'
@@ -119,12 +127,14 @@ E" -Wrapper 'DateDiff' |
         It "processes StringToInt wrapper OK for SQL Server" {
             @{Server='SS13'} | Use-Sql -Template "'42'" -Wrapper 'StringToInt' | Should -Be "CAST('42' AS int)"
         }
-        It "processes StringToIntYYYYMMDD wrapper OK for Oracle" {
-            @{Server='ORA'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToIntYYYYMMDD' |
+        It "processes DateToString + StringToInt combination OK for Oracle" {
+            @{Server='ORA'; Format='YYYYMMDD'} |
+                Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString','StringToInt' |
                 Should -Be "TO_NUMBER(TO_CHAR('01/02/2003', 'YYYYMMDD'))"
         }
-        It "processes StringToIntYYYYMMDD wrapper OK for SQL Server" {
-            @{Server='SS13'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToIntYYYYMMDD' |
+        It "processes DateToString + StringToInt combination OK for SQL Server" {
+            @{Server='SS13'; Format='YYYYMMDD'} |
+                Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString','StringToInt' |
                 Should -Be "CAST(CONVERT(char(8), '01/02/2003', 112) AS int)"
         }
     }
