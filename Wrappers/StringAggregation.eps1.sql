@@ -30,6 +30,6 @@ STUFF((
     , 1, <%= $($Separator.Length) %>, N'') 
 <%-
     }
-    default { Write-Error "Server $Server not yet supported for list aggregation" }
+    default { Write-Error "Server $Server not yet supported for string aggregation" }
 }
 -%>

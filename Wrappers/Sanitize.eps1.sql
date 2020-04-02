@@ -20,6 +20,6 @@ REGEXP_REPLACE(<%= $Body %>, '[[:cntrl:]]')<% -%>
 STRING_ESCAPE(<%= $Body %>, 'json')<% -%>
 <%-
     }
-    default { Write-Error "Server $Server not yet supported for string concatenation." }
+    default { Write-Error "Server $Server not yet supported for string sanitization." }
 }
 -%>

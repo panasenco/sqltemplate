@@ -18,6 +18,6 @@ switch -regex ($Server) {
 [<%= $Body %>]<% -%>
 <%-
     }
-    default { Write-Error "Server $Server not yet supported for string concatenation." }
+    default { Write-Error "Server $Server not yet supported for ID quoting." }
 }
 -%>

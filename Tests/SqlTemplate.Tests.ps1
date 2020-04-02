@@ -18,19 +18,22 @@ Describe "Use-Sql" {
         }
     }
     Context "invoked with cross-platform helper wrappers" {
-        It "processes Concat wrapper OK for Oracle" {
-            @{Server='ORA'} | Use-Sql -Template "'a'`r`n'b'`r`n'c'" -Wrapper 'Concat' |
+        It "processes Concatenate wrapper OK for Oracle" {
+            @{Server='ORA'} | Use-Sql -Template "'a'`r`n'b'`r`n'c'" -Wrapper 'Concatenate' |
                 Should -Be "'a' || 'b' || 'c'"
         }
-        It "processes Concat wrapper OK for SQL Server" {
-            @{Server='SS13'} | Use-Sql -Template "'a'`r`n'b'`r`n'c'" -Wrapper 'Concat' |
+        It "processes Concatenate wrapper OK for SQL Server" {
+            @{Server='SS13'} | Use-Sql -Template "'a'
+'b'
+'c'" -Wrapper 'Concatenate' |
                 Should -Be "'a' + 'b' + 'c'"
         }
         It "processes DateDiff wrapper OK for Oracle" {
             @{Server='ORA'} | Use-Sql -Template "S`r`nE" -Wrapper 'DateDiff' | Should -Be "E - S"
         }
         It "processes DateDiff wrapper OK for SQL Server" {
-            @{Server='SS13'} | Use-Sql -Template "S`r`nE" -Wrapper 'DateDiff' |
+            @{Server='SS13'} | Use-Sql -Template "S
+E" -Wrapper 'DateDiff' |
                 Should -Be "DATEDIFF(day, S, E)"
         }
         It "processes QuotedId wrapper OK for Oracle" {
@@ -49,12 +52,12 @@ Describe "Use-Sql" {
             @{Server='SS13'} | Use-Sql -Template "'abcd'" -Wrapper 'Sanitize' |
                 Should -Be "STRING_ESCAPE('abcd', 'json')"
         }
-        It "processes SingleSelect wrapper OK for Oracle" {
-            @{Server='ORA'} | Use-Sql -Template "'abcd' AS x" -Wrapper 'SingleSelect' |
+        It "processes SelectSingle wrapper OK for Oracle" {
+            @{Server='ORA'} | Use-Sql -Template "'abcd' AS x" -Wrapper 'SelectSingle' |
                 Should -Be "SELECT 'abcd' AS x FROM dual"
         }
-        It "processes SingleSelect wrapper OK for SQL Server" {
-            @{Server='SS13'} | Use-Sql -Template "'abcd' AS x" -Wrapper 'SingleSelect' |
+        It "processes SelectSingle wrapper OK for SQL Server" {
+            @{Server='SS13'} | Use-Sql -Template "'abcd' AS x" -Wrapper 'SelectSingle' |
                 Should -Be "SELECT 'abcd' AS x"
         }
         It "processes StringAggregation wrapper OK for Oracle" {
@@ -102,26 +105,26 @@ Describe "Use-Sql" {
         It "processes SysDate wrapper OK for SQL Server" {
             @{Server='SS13'} | Use-Sql -Wrapper 'SysDate' | Should -Be "CAST(SYSDATETIME() AS date)"
         }
-        It "processes ToDate wrapper OK for Oracle" {
-            @{Server='ORA'; Format='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'ToDate' |
+        It "processes StringToDate wrapper OK for Oracle" {
+            @{Server='ORA'; Format='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate' |
                 Should -Be "TO_DATE('01/02/2003', 'MM/DD/YYYY')"
         }
-        It "processes ToDate wrapper OK for SQL Server" {
-            @{Server='SS13'; Format='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'ToDate' |
+        It "processes StringToDate wrapper OK for SQL Server" {
+            @{Server='SS13'; Format='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate' |
                 Should -Be "CONVERT(DATETIME, '01/02/2003', 101)"
         }
-        It "processes ToInt wrapper OK for Oracle" {
-            @{Server='ORA'} | Use-Sql -Template "'42'" -Wrapper 'ToInt' | Should -Be "TO_NUMBER('42')"
+        It "processes StringToInt wrapper OK for Oracle" {
+            @{Server='ORA'} | Use-Sql -Template "'42'" -Wrapper 'StringToInt' | Should -Be "TO_NUMBER('42')"
         }
-        It "processes ToInt wrapper OK for SQL Server" {
-            @{Server='SS13'} | Use-Sql -Template "'42'" -Wrapper 'ToInt' | Should -Be "CAST('42' AS int)"
+        It "processes StringToInt wrapper OK for SQL Server" {
+            @{Server='SS13'} | Use-Sql -Template "'42'" -Wrapper 'StringToInt' | Should -Be "CAST('42' AS int)"
         }
-        It "processes ToIntYYYYMMDD wrapper OK for Oracle" {
-            @{Server='ORA'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'ToIntYYYYMMDD' |
+        It "processes StringToIntYYYYMMDD wrapper OK for Oracle" {
+            @{Server='ORA'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToIntYYYYMMDD' |
                 Should -Be "TO_NUMBER(TO_CHAR('01/02/2003', 'YYYYMMDD'))"
         }
-        It "processes ToIntYYYYMMDD wrapper OK for SQL Server" {
-            @{Server='SS13'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'ToIntYYYYMMDD' |
+        It "processes StringToIntYYYYMMDD wrapper OK for SQL Server" {
+            @{Server='SS13'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToIntYYYYMMDD' |
                 Should -Be "CAST(CONVERT(char(8), '01/02/2003', 112) AS int)"
         }
     }
