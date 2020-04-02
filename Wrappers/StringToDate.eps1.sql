@@ -5,22 +5,22 @@
     The server to convert the strings in.
 .Parameter Body
     The string expression to convert to date.
-.Parameter Format
+.Parameter FromFormat
     The Oracle-style format mask to use for the conversion.
 -%>
 <%-
 switch -regex ($Server) {
     'ORA.*' {
 -%>
-TO_DATE(<%= $Body %>, '<%= $Format %>')<% -%>
+TO_DATE(<%= $Body %>, '<%= $FromFormat %>')<% -%>
 <%-
     }
     'SS\d\d.*' {
         # Determine the T-SQL datetime style code
-        $SqlStyleCode = switch ($Format) {
+        $SqlStyleCode = switch ($FromFormat) {
             'MM/DD/YYYY' { 101 }
             'YYYYMMDD'   { 112 }
-            default { Write-Error "Can't find matching T-SQL style code for datetime format '$Format'" }
+            default { Write-Error "Can't find matching T-SQL style code for datetime format '$FromFormat'" }
         }
 -%>
 CONVERT(DATETIME, <%= $Body %>, <%= $SqlStyleCode %>)<% -%>

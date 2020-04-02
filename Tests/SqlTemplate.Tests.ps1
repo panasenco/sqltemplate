@@ -37,12 +37,14 @@ E" -Wrapper 'DateDiff' |
                 Should -Be "DATEDIFF(day, S, E)"
         }
         It "processes DateToString wrapper OK for Oracle" {
-            @{Server='ORA'; Format='YYYYMMDD'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
+            @{Server='ORA'; ToFormat='YYYYMMDD'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
                 Should -Be "TO_CHAR('01/02/2003', 'YYYYMMDD')"
         }
         It "processes DateToString wrapper OK for SQL Server" {
-            @{Server='SS13'; Format='YYYYMMDD'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
+            @{Server='SS13'; ToFormat='YYYYMMDD'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
                 Should -Be "CONVERT(char(8), '01/02/2003', 112)"
+            @{Server='SS13'; ToFormat='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString' |
+                Should -Be "CONVERT(char(10), '01/02/2003', 101)"
         }
         It "processes QuotedId wrapper OK for Oracle" {
             @{Server='ORA'} | Use-Sql -Template "abcd" -Wrapper 'QuotedId' |
@@ -114,12 +116,17 @@ E" -Wrapper 'DateDiff' |
             @{Server='SS13'} | Use-Sql -Wrapper 'SysDate' | Should -Be "CAST(SYSDATETIME() AS date)"
         }
         It "processes StringToDate wrapper OK for Oracle" {
-            @{Server='ORA'; Format='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate' |
+            @{Server='ORA'; FromFormat='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate' |
                 Should -Be "TO_DATE('01/02/2003', 'MM/DD/YYYY')"
         }
         It "processes StringToDate wrapper OK for SQL Server" {
-            @{Server='SS13'; Format='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate' |
+            @{Server='SS13'; FromFormat='MM/DD/YYYY'} | Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate' |
                 Should -Be "CONVERT(DATETIME, '01/02/2003', 101)"
+        }
+        It "processes string to date to string in a different format" {
+            @{Server='SS13'; FromFormat='MM/DD/YYYY'; ToFormat='YYYYMMDD'} |
+                Use-Sql -Template "'01/02/2003'" -Wrapper 'StringToDate','DateToString' |
+                Should -Be "CONVERT(char(8), CONVERT(DATETIME, '01/02/2003', 101), 112)"
         }
         It "processes StringToInt wrapper OK for Oracle" {
             @{Server='ORA'} | Use-Sql -Template "'42'" -Wrapper 'StringToInt' | Should -Be "TO_NUMBER('42')"
@@ -128,12 +135,12 @@ E" -Wrapper 'DateDiff' |
             @{Server='SS13'} | Use-Sql -Template "'42'" -Wrapper 'StringToInt' | Should -Be "CAST('42' AS int)"
         }
         It "processes DateToString + StringToInt combination OK for Oracle" {
-            @{Server='ORA'; Format='YYYYMMDD'} |
+            @{Server='ORA'; ToFormat='YYYYMMDD'} |
                 Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString','StringToInt' |
                 Should -Be "TO_NUMBER(TO_CHAR('01/02/2003', 'YYYYMMDD'))"
         }
         It "processes DateToString + StringToInt combination OK for SQL Server" {
-            @{Server='SS13'; Format='YYYYMMDD'} |
+            @{Server='SS13'; ToFormat='YYYYMMDD'} |
                 Use-Sql -Template "'01/02/2003'" -Wrapper 'DateToString','StringToInt' |
                 Should -Be "CAST(CONVERT(char(8), '01/02/2003', 112) AS int)"
         }
