@@ -185,20 +185,11 @@ E" -Wrapper 'DateDiff' |
             $Body | Should -Match "CREATE OR ALTER VIEW dbo.Trivial AS"
             $Body | Should -Match "SELECT"
         }
-    }
-}
-
-Describe "Get-SqlBasename" {
-    It "works with single-extension files" {
-        ".\Tests\Files\NotTemplate.sql" | Get-SqlBasename | Should -Be 'NotTemplate'
-    }
-    It "works with multi-extension files" {
-        ".\Tests\Files\Trivial.eps1.sql" | Get-SqlBasename | Should -Be 'Trivial'
-    }
-    It "works with empty paths" {
-        Get-SqlBasename | Should -Match '^\w+$'
-    }
-    It -Skip "works with non-existent files" {
-        ".\Does\Not\Exist.eps1.sql" | Get-SqlBasename | Should -Be 'Exist'
+        It "gives correct basenames to single-extension files" {
+            Invoke-SqlTemplate -Path ".\Tests\Files\NotTemplate.sql" -Wrapper 'Inline' | Should -match 'NotTemplate$'
+        }
+        It "gives correct basenames to multi files" {
+            Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'Inline' | Should -match 'Trivial$'
+        }
     }
 }

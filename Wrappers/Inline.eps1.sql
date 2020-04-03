@@ -4,4 +4,4 @@
 -%>
 (
   <%= $Body -replace "`n","`n  " %>
-) <%= $ChildPath | Get-SqlBasename %>
+) <%= $Basename %>

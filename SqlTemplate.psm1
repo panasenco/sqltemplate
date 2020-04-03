@@ -9,7 +9,8 @@
      - Server: The type of server to compile the query for. The server binding allows the use of platform-agnostic
            cmdlets like New-Concat, New-StringAgg, New-ToDate, and more in your EPS template files.
      - Body: The body of the nested template for wrapper templates.
-     - ChildPath: The path to the child template file for wrapper templates.
+     - ChildPath: The path to the nested template file for wrapper templates.
+     - Basename: The nested template's name (e.g. basename of ChildPath) for wrapper templates.
 .Parameter Path
     The path to the .eps1.sql template file to apply (does not modify the file, just goes to stdout).
     NOTE The file is only processed with EPS templating if the path ends in .eps1.sql!
@@ -46,6 +47,9 @@ function Invoke-SqlTemplate {
     if ($Wrapper) {
         # Create a clean copy of the binding
         $BindingCopy = $Binding.Clone()
+        if ($Path -and -not $Binding.Basename) {
+            $BindingCopy.Add('Basename', ((Get-Item -Path $Path).BaseName -split '\.')[0])
+        }
         $BindingCopy.Remove('Body')
         $BindingCopy.Remove('ChildPath')
         $BindingCopy.Add('ChildPath', $Path)
@@ -57,27 +61,4 @@ function Invoke-SqlTemplate {
     }
     
     $Body
-}
-
-<#
-.Synopsis
-    Get the SQL object name corresponding to a SQL source file with a given filepath.
-.Parameter Path
-    The path of the file to get the basename of. If the path is not provided, a random string is returned.
-#>
-function Get-SqlBasename {
-    [CmdletBinding()]
-    param (
-        [Parameter(Position=0, ValueFromPipeline=$true)]
-        [string] $Path
-    )
-    if ($Path) {
-        # Get the basename of the file including secondary extensions
-        $Basename = (Get-Item -Path $Path).BaseName
-        # Strip the secondary extensions
-        ($Basename -split '\.')[0]
-    } else {
-        # Return a random collection of alpha characters
-        -join ((65..90) + (97..122) | Get-Random -Count 16 | % {[char]$_})
-    }
 }
