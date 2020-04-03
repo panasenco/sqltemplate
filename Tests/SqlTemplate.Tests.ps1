@@ -124,11 +124,11 @@ E" -Wrapper 'DateDiff' |
                 Invoke-SqlTemplate -Template "'abcdefghijk'" -Wrapper 'SubstringIndex' |
                 Should -Be "CHARINDEX('def', 'abcdefghijk')"
         }
-        It "processes SysDate wrapper OK for Oracle" {
-            @{Server='ORA'} | Invoke-SqlTemplate -Wrapper 'SysDate' | Should -Be "SYSDATE"
+        It "processes SystemDate wrapper OK for Oracle" {
+            @{Server='ORA'} | Invoke-SqlTemplate -Wrapper 'SystemDate' | Should -Be "SYSDATE"
         }
-        It "processes SysDate wrapper OK for SQL Server" {
-            @{Server='SS13'} | Invoke-SqlTemplate -Wrapper 'SysDate' | Should -Be "CAST(SYSDATETIME() AS date)"
+        It "processes SystemDate wrapper OK for SQL Server" {
+            @{Server='SS13'} | Invoke-SqlTemplate -Wrapper 'SystemDate' | Should -Be "CAST(SYSDATETIME() AS date)"
         }
         It "processes StringToDate wrapper OK for Oracle" {
             @{Server='ORA'; FromFormat='MM/DD/YYYY'} |
@@ -188,7 +188,7 @@ E" -Wrapper 'DateDiff' |
         It "gives correct basenames to single-extension files" {
             Invoke-SqlTemplate -Path ".\Tests\Files\NotTemplate.sql" -Wrapper 'Inline' | Should -match 'NotTemplate$'
         }
-        It "gives correct basenames to multi files" {
+        It "gives correct basenames to multi-extension files" {
             Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'Inline' | Should -match 'Trivial$'
         }
     }
