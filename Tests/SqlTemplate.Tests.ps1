@@ -2,12 +2,12 @@
 Import-Module .\SqlTemplate.psd1
 
 Describe "Invoke-SqlTemplate" {
-    Context "invoked with just the path" {
+    Context "invoked without wrappers" {
         It "doesn't invoke EPS on files without .eps1.sql extension" {
             Invoke-SqlTemplate -Path ".\Tests\Files\NotTemplate.sql" | Should -Not -Match "^\s*$"
         }
-        It "can process trivial template files" {
-            Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" | Should -Match "^SELECT 'abc' AS abc\s*$"
+        It "processes trivial template files and trims trailing whitespace" {
+            Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" | Should -Be "SELECT 'abc' AS abc"
         }
         It -Skip "can handle null binding" {
             $Null | Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" |
@@ -16,6 +16,9 @@ Describe "Invoke-SqlTemplate" {
         It "can process simple template files" {
             @{Columns=@('a','b','c')} | Invoke-SqlTemplate -Path ".\Tests\Files\Simple.eps1.sql" |
                 Should -Match "^SELECT 'a' AS a, 'b' AS b, 'c' AS c, 4 AS x\s*$"
+        }
+        It "trims trailing whitespace in string templates" {
+            Invoke-SqlTemplate -Template "SELECT 'a'  `r  `n  `r`n `t " | Should -Be "SELECT 'a'"
         }
     }
     Context "invoked with cross-platform helper wrappers" {
@@ -28,6 +31,10 @@ Describe "Invoke-SqlTemplate" {
 'b'
 'c'" -Wrapper 'Concatenate' |
                 Should -Be "'a' + 'b' + 'c'"
+        }
+        It "trims trailing whitespace in wrappers" {
+            @{Server='ORA'} | Invoke-SqlTemplate -Template "'a'`r`n'b'`r`n'c'`r`n`r`n" -Wrapper 'Concatenate' |
+                Should -Be "'a' || 'b' || 'c'"
         }
         It "processes DateDiff wrapper OK for Oracle" {
             @{Server='ORA'} | Invoke-SqlTemplate -Template "S`r`nE" -Wrapper 'DateDiff' | Should -Be "E - S"
@@ -158,9 +165,13 @@ E" -Wrapper 'DateDiff' |
         }
     }
     Context "invoked with feature wrappers" {
-        It "works with the inline wrapper" {
+        It "processes the CTE wrapper OK" {
+            Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'CTE' |
+                Should -Be "Trivial AS (`r`n  SELECT 'abc' AS abc`r`n)"
+        }
+        It "processes the inline wrapper OK" {
             Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'Inline' |
-                Should -Match "^\(\s*SELECT 'abc' AS abc\s*\) Trivial"
+                Should -Be "(`r`n  SELECT 'abc' AS abc`r`n) Trivial"
         }
         It "processes JUnit wrapper OK for SQL Server" {
             $Body = @{Server='SS13'} | Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'JUnit'

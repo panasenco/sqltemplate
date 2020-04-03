@@ -40,6 +40,9 @@ function Invoke-SqlTemplate {
         $Body = Get-Content -Raw -Path $Path
     }
     
+    # Trim trailing whitespace
+    $Body = $Body -replace '\s*$'
+    
     if ($Wrapper) {
         # Create a clean copy of the binding
         $BindingCopy = $Binding.Clone()
@@ -49,7 +52,7 @@ function Invoke-SqlTemplate {
         # Apply the wrappers in order from innermost to outermost
         foreach ($WrapperName in $Wrapper) {
             $Body = ($BindingCopy + @{Body=$Body}) |
-                Invoke-EpsTemplate -Path "$((Get-Module -Name SqlTemplate).ModuleBase)\Wrappers\$WrapperName.eps1.sql"
+                Invoke-SqlTemplate -Path "$((Get-Module -Name SqlTemplate).ModuleBase)\Wrappers\$WrapperName.eps1.sql"
         }
     }
     
