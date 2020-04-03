@@ -19,7 +19,7 @@
     Array of names of standard wrapper templates (in the Wrappers directory of the SqlTemplate module) to apply, in
     order from innermost to outermost.
 #>
-function Use-Sql {
+function Invoke-SqlTemplate {
     [CmdletBinding()]
     param (
         [Parameter(ValueFromPipeline=$true)]
