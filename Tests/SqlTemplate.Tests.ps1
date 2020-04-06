@@ -85,10 +85,11 @@ E" -Wrapper 'DateDiff' |
                 Invoke-SqlTemplate -Template "y" -Wrapper 'StringAggregation' |
                 Should -Be "LISTAGG(y, '; ') WITHIN GROUP (ORDER BY y DESC)"
         }
-        It "processes StringAggregation wrapper OK for SQL Server" {
-            $Body = @{Server='SS13'; Separator='; '; Order='y DESC'} |
+        It "processes StringAggregation wrapper OK for SQL Server 13" {
+            $Body = @{Server='SS13'; Separator='; '; Order='y DESC'; GroupField='t.y'; Filter='y > 3'} |
                 Invoke-SqlTemplate -Template "y" -Wrapper 'StringAggregation'
             $Body | Should -Match "N'; ' \+ y"
+            $Body | Should -Match "WHERE t.y = t2.y\s*AND y > 3"
             $Body | Should -Match "ORDER BY y DESC"
             $Body | Should -Match "1, 2, N''"
         }
