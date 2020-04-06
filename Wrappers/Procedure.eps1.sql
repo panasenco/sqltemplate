@@ -1,11 +1,10 @@
 <%#
 .Synopsis
     Wrapper to create a stored procedure from a given query.
+.Parameter ProcedurePrefix
+    The prefix (including trailing period if any) to prepend to the basename to construct the stored procedure name
 -%>
-CREATE OR ALTER PROCEDURE <%= $Prefix -join '' %><%= $Basename %> AS
+CREATE OR ALTER PROCEDURE <%= $ProcedurePrefix %><%= $Basename %> AS
 BEGIN
-  DECLARE @BenchmarkStartTime DATETIME;
-  DECLARE @BenchmarkEndTime DATETIME;
-
   <%= $Body -replace "`n","`n  " %>
 END

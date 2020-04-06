@@ -180,7 +180,7 @@ E" -Wrapper 'DateDiff' |
             $Body | Should -Match "AS test_result\s+UNION ALL"
         }
         It "works with nested wrappers" {
-            $Body = @{Server='SS13'; Prefix='dbo.'} |
+            $Body = @{Server='SS13'; ProcedurePrefix='dbo.'; TablePrefix='dbo.' } |
                 Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper @('View','Procedure')
             $Body | Should -Match "^CREATE OR ALTER PROCEDURE dbo.Trivial AS\s*BEGIN"
             $Body | Should -Match "CREATE OR ALTER VIEW dbo.Trivial AS"
@@ -191,6 +191,21 @@ E" -Wrapper 'DateDiff' |
         }
         It "gives correct basenames to multi-extension files" {
             Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'Inline' | Should -match 'Trivial$'
+        }
+        It "materializes correctly in SQL Server" {
+            $Body = @{Server='SS13'; TablePrefix='dbo.'} | Invoke-SqlTemplate -Path ".\Tests\Files\Complex.eps1.sql" `
+                -Wrapper 'Materialize'
+            $Body | Should -Match 'DROP TABLE dbo\.Complex[^\r\n]*\r\n\s*WITH'
+            $Body | Should -Match 'INTO dbo\.Complex\r\n\s*FROM NonRootFruits'
+            $Body | Should -Not -Match 'INTO [^\r\n]*\r\n\s*INTO'
+        }
+        It "processes nested materialization correctly in SQL Server" {
+            $Body = @{Server='SS13'; TablePrefix='dbo.'} | Invoke-SqlTemplate -Path `
+                ".\Tests\Files\MaterializeSelect.eps1.sql" ` -Wrapper 'Materialize'
+            $Body | Should -Match 'DROP TABLE dbo\.Complex[^\r\n]*\r\n\s*WITH'
+            $Body | Should -Match 'INTO dbo\.Complex\r\n\s*FROM NonRootFruits'
+            $Body | Should -Not -Match 'INTO [^\r\n]*\r\n\s*INTO'
+            $Body | Should -Match 'DECLARE @BenchmarkStartTime DATETIME;'
         }
     }
 }
