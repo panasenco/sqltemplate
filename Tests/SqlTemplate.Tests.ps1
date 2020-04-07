@@ -174,10 +174,14 @@ E" -Wrapper 'DateDiff' |
             Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'Inline' |
                 Should -Be "(`r`n  SELECT 'abc' AS abc`r`n) Trivial"
         }
-        It "processes JUnit wrapper OK for SQL Server" {
+        It "processes simple JUnit wrapper OK for SQL Server" {
             $Body = @{Server='SS13'} | Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper 'JUnit'
             $Body | Should -Match "xml"
             $Body | Should -Match "AS test_result\s+UNION ALL"
+        }
+        It "processes JUnit wrapper with CTES OK for SQL Server" {
+            $Body = @{Server='SS13'} | Invoke-SqlTemplate -Path ".\Tests\Files\Complex.eps1.sql" -Wrapper 'JUnit'
+            $Body | Should -Match "\)`r`n\s*SELECT '<\?xml"
         }
         It "processes individual JUnit wrapper OK for SQL Server" {
             @{Server='SS13'; TestName='my test'} | Invoke-SqlTemplate -Template 'x=1' -Wrapper 'JUnitTest' |
