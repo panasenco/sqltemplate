@@ -179,6 +179,11 @@ E" -Wrapper 'DateDiff' |
             $Body | Should -Match "xml"
             $Body | Should -Match "AS test_result\s+UNION ALL"
         }
+        It "processes individual JUnit wrapper OK for SQL Server" {
+            @{Server='SS13'; TestName='my test'} | Invoke-SqlTemplate -Template 'x=1' -Wrapper 'JUnitTest' |
+                Should -Be ("'<testcase name=`"my test`">' + CASE WHEN x=1 THEN '' ELSE '<failure/>' END + " +
+                "'</testcase>' AS test_result")
+        }
         It "works with nested wrappers" {
             $Body = @{Server='SS13'; ProcedurePrefix='dbo.'; TablePrefix='dbo.' } |
                 Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper @('View','Procedure')
