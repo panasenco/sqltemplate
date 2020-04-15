@@ -80,14 +80,14 @@ E" -Wrapper 'DateDiff' |
             @{Server='SS13'} | Invoke-SqlTemplate -Template "'abcd' AS x" -Wrapper 'SelectSingle' |
                 Should -Be "SELECT 'abcd' AS x"
         }
-        It "processes StringAggregation wrapper OK for Oracle" {
+        It "processes Aggregate wrapper OK for Oracle" {
             @{Server='ORA'; Separator='; '; Order='y DESC'} |
-                Invoke-SqlTemplate -Template "y" -Wrapper 'StringAggregation' |
+                Invoke-SqlTemplate -Template "y" -Wrapper 'Aggregate' |
                 Should -Be "LISTAGG(y, '; ') WITHIN GROUP (ORDER BY y DESC)"
         }
-        It "processes StringAggregation wrapper OK for SQL Server 13" {
+        It "processes Aggregate wrapper OK for SQL Server 13" {
             $Body = @{Server='SS13'; Separator='; '; Order='y DESC'; GroupField='t.y'; Filter='y > 3'} |
-                Invoke-SqlTemplate -Template "y" -Wrapper 'StringAggregation'
+                Invoke-SqlTemplate -Template "y" -Wrapper 'Aggregate'
             $Body | Should -Match "N'; ' \+ y"
             $Body | Should -Match "WHERE t.y = t2.y\s*AND y > 3"
             $Body | Should -Match "ORDER BY y DESC"
