@@ -216,5 +216,9 @@ E" -Wrapper 'DateDiff' |
             $Body | Should -Not -Match 'INTO [^\r\n]*\r\n\s*INTO'
             $Body | Should -Match 'DECLARE @BenchmarkStartTime DATETIME;'
         }
+        It "conditionally executes correctly in SQL Server" {
+            $Body = @{Server='SS13'} | Invoke-SqlTemplate -Template 'dbo.sp_stuff' -Wrapper 'ExecuteIfExists'
+            $Body | Should -Be "IF OBJECT_ID('dbo.sp_stuff', 'P') IS NOT NULL`r`n  EXEC dbo.sp_stuff;"
+        }
     }
 }
