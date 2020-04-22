@@ -20,6 +20,6 @@ INSTR(<%= $Body %>, <%= $Substring %>)<% -%>
 CHARINDEX(<%= $Substring %>, <%= $Body %>)<% -%>
 <%-
     }
-    default { Write-Error "Server $Server not yet supported for string concatenation." }
+    default { Write-Error "Server $Server not yet supported for substring indexing." }
 }
 -%>
