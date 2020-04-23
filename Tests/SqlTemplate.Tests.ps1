@@ -189,7 +189,7 @@ E" -Wrapper 'DateDiff' |
                 "'</testcase>' AS test_result")
         }
         It "works with nested wrappers" {
-            $Body = @{Server='SS13'; ProcedurePrefix='dbo.'; TablePrefix='dbo.' } |
+            $Body = @{Server='SS13'; ProcedurePrefix='dbo.'; ViewPrefix='dbo.' } |
                 Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper @('View','Procedure')
             $Body | Should -Match "^CREATE OR ALTER PROCEDURE dbo.Trivial AS\s*BEGIN"
             $Body | Should -Match "CREATE OR ALTER VIEW dbo.Trivial AS"
