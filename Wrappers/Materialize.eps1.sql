@@ -1,9 +1,10 @@
 <%#
 .Synopsis
-    Wrapper to materialize a table from a given query. Meant to be called from MaterializationProcedure.
+    Wrapper to materialize a given query.
 .Description
-    In SQL Server, this is kind of a hack. First, find the last existing materialization (the index of the last FROM
-    already following an INTO statement), if any.
+    In SQL Server, this is kind of a hack in that it relies on top-level SELECT, INTO, FROM, UNION, and WITH statements
+    to be on their own lines and not indented at all.
+    First, find the last existing materialization (the index of the last FROM already following an INTO statement), if any.
     The INTO statement is inserted before the first of the least indented FROMs following the last existing
     materialization.
     The DROP statements are inserted before the first of the least indented WITHs or SELECTs preceding the above FROM
@@ -13,27 +14,37 @@
 -%>
 <%-
 if ($Server -notmatch '^SS.*') { Write-Error "Only SQL Server currently supported for materialization" }
-# Find the index of the last existing INTO FROM statement
-$LastExistingMaterialization = (($Body | Select-String -Pattern '(?<=INTO[^\r\n]*\r\n[^\S\r\n]*FROM)|^' `
-    -AllMatches)[0].matches | Sort-Object -Property Index -Descending)[0].Index
-# Find the index of the first FROM that is least indented and following the last existing materialization.
-$PreIntoIndex = (($Body | Select-String -Pattern '\r?\n[^\S\r\n]*FROM' -AllMatches)[0].matches |
-    Sort-Object -Property Length,Index | where {$_.Index -ge $LastExistingMaterialization})[0].Index
-$PreDropIndex = (($Body | Select-String -Pattern '(\r?\n|^)[^\S\r\n]*(SELECT|WITH)' -AllMatches)[0].matches |
-    Sort-Object -Property Length,Index | where {$_.Index -ge $LastExistingMaterialization -and `
-    $_.Index -lt $PreIntoIndex })[0].Index
+# Loop through the lines to find where to place statements
+$BodyLines = $Body -split "`r?`n"
+$PreDropIndex = $null
+$PreIntoIndex = $null
+for ($LineIndex=0; $LineIndex -lt $BodyLines.Length; $LineIndex++) {
+    switch -regex ($BodyLines[$LineIndex]) {
+        '^INTO' {
+            # There is existing materialization - Reset the pre-into and pre-drop indices
+            $PreDropIndex = $null
+            $PreIntoIndex = $null
+        }
+        '^(WITH|SELECT)' {
+            # Ensure this is the first WITH/SELECT not preceded by a UNION
+            if ($PreDropIndex -eq $null -and ($LineIndex -lt 1 -or $BodyLines[$LineIndex-1] -notmatch '^UNION')) {
+                $PreDropIndex = $LineIndex
+            }
+        }
+        '^FROM' {
+            # Ensure this is the first FROM following the pre-drop line
+            if ($PreDropIndex -ne $null -and $PreIntoIndex -eq $null) {
+                $PreIntoIndex = $LineIndex
+            }
+        }
+    }
+}
 -%>
-<%= $Body.Substring(0,$PreDropIndex) %>
-<%- if ($Body -notmatch 'DECLARE @BenchmarkStartTime DATETIME;') { -%>
-DECLARE @BenchmarkStartTime DATETIME;
-DECLARE @BenchmarkEndTime DATETIME;
+<%- if ($PreDropIndex -ge 1) { -%>
+<%= $BodyLines[0..($PreDropIndex-1)] -join "`r`n" %>
 <%- } -%>
-SET @BenchmarkStartTime = GETDATE();
 IF OBJECT_ID('<%= $TablePrefix %><%= $Basename %>', 'V') IS NOT NULL DROP VIEW <%= $TablePrefix %><%= $Basename %>;
 IF OBJECT_ID('<%= $TablePrefix %><%= $Basename %>', 'U') IS NOT NULL DROP TABLE <%= $TablePrefix %><%= $Basename %>;
-<%= $Body.Substring($PreDropIndex, $PreIntoIndex-$PreDropIndex) %>
-INTO <%= $TablePrefix %><%= $Basename -%>
-<%= $Body.Substring($PreIntoIndex) %>
-SET @BenchmarkEndTime = GETDATE();
-SELECT FORMAT(DATEDIFF(millisecond, @BenchmarkStartTime, @BenchmarkEndTime)/1000.0, '.##') +
-    's to create <%= $TablePrefix %><%= $Basename %>' AS msg
+<%= $BodyLines[$PreDropIndex..($PreIntoIndex-1)] -join "`r`n" %>
+INTO <%= $TablePrefix %><%= $Basename %>
+<%= $BodyLines[$PreIntoIndex..($BodyLines.Length-1)] -join "`r`n" %>

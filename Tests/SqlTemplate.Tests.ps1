@@ -208,13 +208,13 @@ E" -Wrapper 'DateDiff' |
             $Body | Should -Match 'INTO dbo\.Complex\r\n\s*FROM NonRootFruits'
             $Body | Should -Not -Match 'INTO [^\r\n]*\r\n\s*INTO'
         }
-        It "processes nested materialization correctly in SQL Server" {
+        It "inserts DROP TABLEs, INTOs, and variable declarations as expected in nested materialization" {
             $Body = @{Server='SS13'; TablePrefix='dbo.'} | Invoke-SqlTemplate -Path `
                 ".\Tests\Files\MaterializeSelect.eps1.sql" ` -Wrapper 'Materialize'
             $Body | Should -Match 'DROP TABLE dbo\.Complex[^\r\n]*\r\n\s*WITH'
             $Body | Should -Match 'INTO dbo\.Complex\r\n\s*FROM NonRootFruits'
             $Body | Should -Not -Match 'INTO [^\r\n]*\r\n\s*INTO'
-            $Body | Should -Match 'DECLARE @BenchmarkStartTime DATETIME;'
+            $Body | Should -Not -Match 'UNION ALL\r\nIF OBJECT_ID'
         }
         It "conditionally executes correctly in SQL Server" {
             $Body = @{Server='SS13'} | Invoke-SqlTemplate -Template 'dbo.sp_stuff' -Wrapper 'ExecuteIfExists'
