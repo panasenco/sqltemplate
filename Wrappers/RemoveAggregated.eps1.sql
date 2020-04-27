@@ -9,9 +9,10 @@
     List of values to remove from body.
 -%>
 <%=
-$ExpandedList = ($RemoveList | foreach {"$Separator$_"}) + ($RemoveList | foreach {"$_$Separator"}) + $RemoveList
+$ExpandedList = ($RemoveList | foreach {"'$Separator' + $_"}) + ($RemoveList | foreach {"$_ + '$Separator'"}) +
+    $RemoveList
 foreach ($Remove in $ExpandedList) {
-    $Body = "REPLACE($Body, '$Remove', '')"
+    $Body = "REPLACE($Body, $Remove, '')"
 }
 $Body
 %>

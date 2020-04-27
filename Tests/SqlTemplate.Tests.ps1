@@ -165,10 +165,10 @@ E" -Wrapper 'DateDiff' |
                 Should -Be "CAST(CONVERT(char(8), '01/02/2003', 112) AS int)"
         }
         It "scrubs values from aggregated strings OK" {
-            @{Separator='; '; RemoveList=@('abcd','efg')} |
+            @{Separator='; '; RemoveList=@("'abcd'",'efg')} |
                 Invoke-SqlTemplate -Template 'string' -Wrapper 'RemoveAggregated' | Should -Be (
-                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(string, '; abcd', ''), '; efg', ''), " + 
-                "'abcd; ', ''), 'efg; ', ''), 'abcd', ''), 'efg', '')")
+                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(string, '; ' + 'abcd', ''), '; ' + efg, ''), " + 
+                "'abcd' + '; ', ''), efg + '; ', ''), 'abcd', ''), efg, '')")
         }
     }
     Context "invoked with feature wrappers" {
