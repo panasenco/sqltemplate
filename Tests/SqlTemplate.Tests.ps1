@@ -164,6 +164,12 @@ E" -Wrapper 'DateDiff' |
                 Invoke-SqlTemplate -Template "'01/02/2003'" -Wrapper 'DateToString','StringToInt' |
                 Should -Be "CAST(CONVERT(char(8), '01/02/2003', 112) AS int)"
         }
+        It "scrubs values from aggregated strings OK" {
+            @{Separator='; '; RemoveList=@('abcd','efg')} |
+                Invoke-SqlTemplate -Template 'string' -Wrapper 'RemoveAggregated' | Should -Be (
+                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(string, '; abcd', ''), '; efg', ''), " + 
+                "'abcd; ', ''), 'efg; ', ''), 'abcd', ''), 'efg', '')")
+        }
     }
     Context "invoked with feature wrappers" {
         It "processes the CTE wrapper OK" {
