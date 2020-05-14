@@ -174,6 +174,42 @@ E" -Wrapper 'DateDiff' |
                 "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(string, '; ' + 'abcd', ''), '; ' + efg, ''), " + 
                 "'abcd' + '; ', ''), efg + '; ', ''), 'abcd', ''), efg, '')")
         }
+        It "processes example file OK for Oracle" {
+            @{Server='ORA'} | Invoke-SqlTemplate -Path .\Tests\Files\example.eps1.sql | Should -Be `
+"SELECT
+  Customers.key,
+  TO_NUMBER(TO_CHAR(Purchases.date, 'YYYYMMDD')) AS PurchaseDateKey,
+  SUBSTR(Purchases.fullname, 1, INSTR(Purchases.fullname, ' ')) AS PurchaseCode
+FROM Purchases
+LEFT JOIN Customers ON Purchases.customer_key = Customers.key"
+        }
+    It "processes example file OK for SQL Server" {
+            @{Server='SS13'} | Invoke-SqlTemplate -Path .\Tests\Files\example.eps1.sql | Should -Be `
+"SELECT
+  Customers.key,
+  CAST(CONVERT(char(8), Purchases.date, 112) AS int) AS PurchaseDateKey,
+  SUBSTRING(Purchases.fullname, 1, CHARINDEX(' ', Purchases.fullname)) AS PurchaseCode
+FROM Purchases
+LEFT JOIN Customers ON Purchases.customer_key = Customers.key"
+        }
+    }
+    It "processes CTEs and inline queries OK in a file" {
+        Invoke-SqlTemplate -Path .\Tests\Files\MainQuery.eps1.sql | Should -Be `
+"WITH subquery1 AS (
+  SELECT 'This is the first subquery' AS var1
+),
+subquery2 AS (
+  SELECT 'This is the second subquery' AS var2
+)
+SELECT
+  subquery1.var1,
+  subquery2.var2,
+  subquery3.var3
+FROM subquery1
+LEFT JOIN subquery2 ON 2=2
+LEFT JOIN (
+  SELECT 'This is the third subquery' AS var3
+) subquery3 ON 3=3"
     }
     Context "invoked with feature wrappers" {
         It "processes the CTE wrapper OK" {
