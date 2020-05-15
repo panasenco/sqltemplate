@@ -12,7 +12,7 @@
 RootModule = 'SqlTemplate.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.0'
+ModuleVersion = '1.0.4'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -52,7 +52,14 @@ SOFTWARE.
 '@
 
 # Description of the functionality provided by this module
-Description = 'SQL templating tools to develop cross-platform queries and reuse CTEs.'
+Description = @'
+SqlTemplate is a templating tool based on Embedded PowerShell that aims to resolve the following frequent SQL pain
+points:
+ * Reusing subqueries and CTEs across multiple queries
+ * Writing queries meant to run on different SQL platforms
+ * Generating many similar columns
+Read the guide and browse the source code at https://github.com/panasenco/sqltemplate
+'@
 
 # Minimum version of the Windows PowerShell engine required by this module
 # PowerShellVersion = ''
@@ -109,7 +116,31 @@ AliasesToExport = @()
 # ModuleList = @()
 
 # List of all files packaged with this module
-# FileList = @()
+FileList = @(
+    '.\Wrappers\Aggregate.eps1.sql',
+    '.\Wrappers\Concatenate.eps1.sql',
+    '.\Wrappers\CTE.eps1.sql',
+    '.\Wrappers\DateDiff.eps1.sql',
+    '.\Wrappers\DateToString.eps1.sql',
+    '.\Wrappers\ExecuteIfExists.eps1.sql',
+    '.\Wrappers\GitHistory.eps1.sql',
+    '.\Wrappers\Inline.eps1.sql',
+    '.\Wrappers\JUnit.eps1.sql',
+    '.\Wrappers\JUnitTest.eps1.sql',
+    '.\Wrappers\Materialize.eps1.sql',
+    '.\Wrappers\Procedure.eps1.sql',
+    '.\Wrappers\QuotedId.eps1.sql',
+    '.\Wrappers\RemoveAggregated.eps1.sql',
+    '.\Wrappers\Sanitize.eps1.sql',
+    '.\Wrappers\SelectSingle.eps1.sql',
+    '.\Wrappers\StringLength.eps1.sql',
+    '.\Wrappers\StringToDate.eps1.sql',
+    '.\Wrappers\StringToInt.eps1.sql',
+    '.\Wrappers\Substring.eps1.sql',
+    '.\Wrappers\SubstringIndex.eps1.sql',
+    '.\Wrappers\SystemDate.eps1.sql',
+    '.\Wrappers\View.eps1.sql'
+)
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
@@ -120,7 +151,7 @@ PrivateData = @{
         Tags = @('SQL','Template')
 
         # A URL to the license for this module.
-        LicenseUri = 'https://raw.githubusercontent.com/panasenco/sqltemplate/master/LICENSE'
+        LicenseUri = 'https://opensource.org/licenses/MIT'
 
         # A URL to the main website for this project.
         ProjectUri = 'https://github.com/panasenco/sqltemplate'

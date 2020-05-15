@@ -3,6 +3,13 @@ sqltemplate
 SqlTemplate is a templating tool based on [Embedded PowerShell](http://straightdave.github.io/eps/) that aims to
 resolve the following frequent SQL pain points:
 
+Installation instructions
+-------------------------
+Simply run the following line to install the module from
+[PowerShell Gallery](https://www.powershellgallery.com/packages/SqlTemplate):
+```
+Install-Module -Name SqlTemplate
+```
 
 Reusing subqueries and CTEs across multiple queries
 ---------------------------------------------------
