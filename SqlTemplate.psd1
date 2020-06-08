@@ -12,7 +12,7 @@
 RootModule = 'SqlTemplate.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.4'
+ModuleVersion = '1.1.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -128,6 +128,7 @@ FileList = @(
     '.\Wrappers\JUnit.eps1.sql',
     '.\Wrappers\JUnitTest.eps1.sql',
     '.\Wrappers\Materialize.eps1.sql',
+    '.\Wrappers\NoLock.eps1.sql',
     '.\Wrappers\Procedure.eps1.sql',
     '.\Wrappers\QuotedId.eps1.sql',
     '.\Wrappers\RemoveAggregated.eps1.sql',

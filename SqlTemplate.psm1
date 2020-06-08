@@ -201,8 +201,12 @@ function Invoke-SqlTemplate {
         # Apply the wrappers in order from innermost to outermost
         $ModuleFileList = Get-Item (Get-Module -Name SqlTemplate).FileList
         foreach ($WrapperName in $Wrapper) {
-            $Body = ($BindingCopy + @{Body=$Body}) |
-                Invoke-SqlTemplate -Path ($ModuleFileList | where {$_.Basename -eq "$WrapperName.eps1"})
+            $WrapperFile = $ModuleFileList | where {$_.Basename -eq "$WrapperName.eps1"}
+            if (-not $WrapperFile) {
+                throw ("Can't find wrapper $WrapperName. Please ensure it's in the Wrappers directory and listed " +
+                    "in FileList in SqlTemplate.psd1.")
+            }
+            $Body = ($BindingCopy + @{Body=$Body}) | Invoke-SqlTemplate -Path $WrapperFile
         }
     }
     

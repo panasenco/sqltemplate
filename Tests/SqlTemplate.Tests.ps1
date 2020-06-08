@@ -9,6 +9,9 @@ Describe "Invoke-SqlTemplate" {
         It "processes trivial template files and trims trailing whitespace" {
             Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" | Should -Be "SELECT 'abc' AS abc"
         }
+        It "raises errors with nonexistent template files" {
+            { @{Server='ORA'} | Invoke-SqlTemplate -Path '.\NonExistentTemplate.eps1.sql' } | Should -Throw
+        }
         It -Skip "can handle null binding" {
             $Null | Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" |
                 Should -Match "^SELECT 'abc' AS abc\s*$"
@@ -22,6 +25,9 @@ Describe "Invoke-SqlTemplate" {
         }
     }
     Context "invoked with cross-platform helper wrappers" {
+        It "raises errors with nonexistent wrappers" {
+            { @{Server='ORA'} | Invoke-SqlTemplate -Template 'abc' -Wrapper 'NonExistentWrapper' } | Should -Throw
+        }
         It "processes Concatenate wrapper OK for Oracle" {
             @{Server='ORA'} | Invoke-SqlTemplate -Template "'a'`r`n'b'`r`n'c'" -Wrapper 'Concatenate' |
                 Should -Be "'a' || 'b' || 'c'"
@@ -265,6 +271,22 @@ LEFT JOIN (
         It "conditionally executes correctly in SQL Server" {
             $Body = @{Server='SS13'} | Invoke-SqlTemplate -Template 'dbo.sp_stuff' -Wrapper 'ExecuteIfExists'
             $Body | Should -Be "IF OBJECT_ID('dbo.sp_stuff', 'P') IS NOT NULL`r`n  EXEC dbo.sp_stuff;"
+        }
+        It "appends (NOLOCK) hints correctly in SQL Server" {
+            @{Server='SS13'} | Invoke-SqlTemplate -Template '' -Wrapper 'NoLock' | Should -Be ''
+            @{Server='SS13'} | Invoke-SqlTemplate -Template 'a.b' -Wrapper 'NoLock' | Should -Be 'a.b'
+            @{Server='SS13'; AppendNoLock='DB_NAME.dbo'} | Invoke-SqlTemplate -Template `
+                'SELECT * FROM DB_NAME.dbo.table_name' -Wrapper 'NoLock' |
+                Should -Be 'SELECT * FROM DB_NAME.dbo.table_name (NOLOCK)'
+            @{Server='SS13'; AppendNoLock='DB_NAME.dbo'} | Invoke-SqlTemplate -Template `
+                'SELECT * FROM DB_NAME.dbo.table_name WHERE x=1' -Wrapper 'NoLock' |
+                Should -Be 'SELECT * FROM DB_NAME.dbo.table_name (NOLOCK) WHERE x=1'
+            @{Server='SS13'; AppendNoLock='DB_NAME.dbo'} | Invoke-SqlTemplate -Template `
+                'WHERE DB_NAME.dbo.table_name.column = 1' -Wrapper 'NoLock' |
+                Should -Be 'WHERE DB_NAME.dbo.table_name.column = 1'
+            @{Server='SS13'; AppendNoLock=@('DB_NAME.dbo','DB2.sch')} | Invoke-SqlTemplate -Template `
+                "SELECT`n*`nFROM`nDB_NAME.dbo.table_name`nLEFT JOIN DB2.sch.t2 ON 1=1" -Wrapper 'NoLock' |
+                Should -Be "SELECT`n*`nFROM`nDB_NAME.dbo.table_name (NOLOCK)`nLEFT JOIN DB2.sch.t2 (NOLOCK) ON 1=1"
         }
     }
 }
