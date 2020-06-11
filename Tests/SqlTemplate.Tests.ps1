@@ -240,6 +240,15 @@ LEFT JOIN (
                 Should -Be ("'<testcase name=`"my test`">' + CASE WHEN x=1 THEN '' ELSE '<failure/>' END + " +
                 "'</testcase>' AS test_result")
         }
+        It "processes nonsensical Mocha wrapper OK for SQL Server" {
+            @{Server='SS13'} | Invoke-SqlTemplate -Template 'x' -Wrapper 'Mocha'
+        }
+        It "strips trailing comma in Mocha wrapper OK for SQL Server" {
+            $Body = @{Server='SS13'} | Invoke-SqlTemplate -Template `
+                "SELECT 'x,' AS test_result`nUNION ALL`nSELECT 'y,' AS test_result" -Wrapper 'Mocha'
+            $Body | Should -Match "SELECT 'x,' AS test_result"
+            $Body | Should -Match "SELECT 'y' AS test_result"
+        }
         It "works with nested wrappers" {
             $Body = @{Server='SS13'; ProcedurePrefix='dbo.'; ViewPrefix='dbo.' } |
                 Invoke-SqlTemplate -Path ".\Tests\Files\Trivial.eps1.sql" -Wrapper @('View','Procedure')
