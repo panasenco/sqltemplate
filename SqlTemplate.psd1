@@ -131,6 +131,7 @@ FileList = @(
     '.\Wrappers\Mocha.eps1.sql',
     '.\Wrappers\NoLock.eps1.sql',
     '.\Wrappers\NUnit.eps1.sql',
+    '.\Wrappers\NUnitTest.eps1.sql',
     '.\Wrappers\Procedure.eps1.sql',
     '.\Wrappers\QuotedId.eps1.sql',
     '.\Wrappers\RemoveAggregated.eps1.sql',

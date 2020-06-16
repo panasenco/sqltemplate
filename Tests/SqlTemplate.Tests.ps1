@@ -240,6 +240,12 @@ LEFT JOIN (
                 Should -Be ("'<testcase name=`"my test`">' + CASE WHEN x=1 THEN '' ELSE '<failure/>' END + " +
                 "'</testcase>' AS test_result")
         }
+        It "processes individual NUnit wrapper OK for SQL Server" {
+            @{Server='SS13'; TableName='dbo.my_table'; TestName='my test. with.periods'} |
+                Invoke-SqlTemplate -Template 'x=1' -Wrapper 'NUnitTest' |
+                Should -Be ("'<test-case name=`"sqltest.dbomy_table.my test withperiods`" executed=`"True`" success=`"' + " + 
+                    "CASE WHEN x=1 THEN 'True' ELSE 'False' END + '`"/>' AS test_result")
+        }
         It "processes nonsensical Mocha wrapper OK for SQL Server" {
             @{Server='SS13'} | Invoke-SqlTemplate -Template 'x' -Wrapper 'Mocha'
         }
