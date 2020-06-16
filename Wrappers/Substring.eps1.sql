@@ -12,6 +12,9 @@
 -%>
 <%-
 if (-not $Position) { $Position = 1 }
+if (-not $Length) {
+  $Length = "$($Binding | Invoke-SqlTemplate -Template $Body -Wrapper 'StringLength')-($Position)+1"
+}
 switch -regex ($Server) {
     'ORA.*' {
 -%>

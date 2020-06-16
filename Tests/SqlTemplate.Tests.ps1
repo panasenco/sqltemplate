@@ -121,6 +121,10 @@ E" -Wrapper 'DateDiff' |
             @{Server='SS13'; Length=5} | Invoke-SqlTemplate -Template "'abcdefghijk'" -Wrapper 'Substring' |
                 Should -Be "SUBSTRING('abcdefghijk', 1, 5)"
         }
+        It "defaults length to length of string - position + 1 in Substring wraper" {
+            @{Server='SS13'; Position=5} | Invoke-SqlTemplate -Template "'abcdefghijk'" -Wrapper 'Substring' |
+                Should -Be "SUBSTRING('abcdefghijk', 5, LEN('abcdefghijk')-(5)+1)"
+        }
         It "processes SubstringIndex wrapper OK for Oracle" {
             @{Server='ORA'; Substring="'def'"} |
                 Invoke-SqlTemplate -Template "'abcdefghijk'" -Wrapper 'SubstringIndex' |
