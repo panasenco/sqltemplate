@@ -36,7 +36,7 @@ STUFF((
         N'<%= $Separator %>' + <%= $Body %>
       FROM <%= $Table %> t2
       WHERE <%= $Table %>.<%= $Field %> = t2.<%= $Field %><% if ($Filter) { %>
-        AND <%= $Filter %><% } %>
+        AND (<%= $Filter %>)<% } %>
       ORDER BY <%= $Order %>
       FOR XML PATH (N''), ROOT('root'), type
       ).value('/root[1]','VARCHAR(MAX)')

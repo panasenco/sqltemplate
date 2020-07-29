@@ -95,7 +95,7 @@ E" -Wrapper 'DateDiff' |
             $Body = @{Server='SS13'; Separator='; '; Order='y DESC'; GroupField='t.y'; Filter='y > 3'} |
                 Invoke-SqlTemplate -Template "y" -Wrapper 'Aggregate'
             $Body | Should -Match "N'; ' \+ y"
-            $Body | Should -Match "WHERE t.y = t2.y\s*AND y > 3"
+            $Body | Should -Match "WHERE t.y = t2.y\s*AND \(y > 3\)"
             $Body | Should -Match "ORDER BY y DESC"
             $Body | Should -Match "1, 2, N''"
         }
