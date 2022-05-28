@@ -1,3 +1,8 @@
+Archived - use [dbt](https://www.getdbt.com/) instead
+=====================================================
+
+I've written this repo before learning about [dbt](https://www.getdbt.com/). dbt is definitely the superior framework to this.
+
 sqltemplate
 ===========
 SqlTemplate is a templating tool based on [Embedded PowerShell](http://straightdave.github.io/eps/) that aims to
